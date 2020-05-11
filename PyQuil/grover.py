@@ -8,6 +8,7 @@ import numpy as np
 import itertools
 import math
 import time
+import datetime
 import matplotlib.pyplot as plt 
 import func
 from func import *
@@ -116,40 +117,33 @@ if __name__ == '__main__':
 		qc = get_qc('9q-square-qvm')
 		qc.compiler.client.timeout = 10000
 
-		start_time = time.time()
-		p = grover_program(get_Z_f(func_in, n), get_Z_0(n), n)
-		result = qc.run_and_measure(p, trials=trials)
-		print_results(func_in_name, func_in, result, time.time() - start_time, trials, n)
+		all_funcs = [(func_in, func_in_name), \
+									(all_ones, "All 1's"), \
+									(all_zeros, "All 0's"), \
+									(xnor, 'XNOR-reduce'), \
+									(zero, 'Constant 0')]
 
-		start_time = time.time()
-		p = grover_program(get_Z_f(f, n), get_Z_0(n), n)
-		result = qc.run_and_measure(p, trials=trials)
-		print_results("All 1's", f, result, time.time() - start_time, trials, n)
-
-		start_time = time.time()
-		p = grover_program(get_Z_f(g, n), get_Z_0(n), n)
-		result = qc.run_and_measure(p, trials=trials)
-		print_results("All 0's", g, result, time.time() - start_time, trials, n)
-
-		start_time = time.time()
-		p = grover_program(get_Z_f(h, n), get_Z_0(n), n)
-		result = qc.run_and_measure(p, trials=trials)
-		print_results("XNOR-reduce", h, result, time.time() - start_time, trials, n)
-
-		start_time = time.time()
-		p = grover_program(get_Z_f(zero, n), get_Z_0(n), n)
-		result = qc.run_and_measure(p, trials=trials)
-		print_results("Constant 0", zero, result, time.time() - start_time, trials, n)
-
-		exec_times = []
-		for n_test in [1, 2, 4]:
+		for fn, fn_name in all_funcs:
+			Z_f = get_Z_f(fn, n)
+			Z_0 = get_Z_0(n)
 			start_time = time.time()
-			p = grover_program(get_Z_f(f, n_test), get_Z_0(n_test), n_test)
-			result = qc.run_and_measure(p, trials=1)
-			exec_times.append(time.time() - start_time)
-		plt.plot([1, 2, 4], exec_times)
-		plt.xlabel('Number of qubits')
-		plt.ylabel('Execution time (in seconds)')
-		plt.title('Scalability as number of qubits grows')
-		# plt.savefig('grover_scalability.png')
+			p = grover_program(Z_f, Z_0, n)
+			result = qc.run_and_measure(p, trials=trials)
+			print_results(fn_name, fn, result, time.time() - start_time, trials, n)
+
+			exec_times = []
+			for n_test in [1, 2, 4, 6]:
+				Z_f = get_Z_f(fn, n_test)
+				Z_0 = get_Z_0(n_test)
+				start_time = time.time()
+				p = grover_program(Z_f, Z_0, n_test)
+				result = qc.run_and_measure(p, trials=1)
+				exec_times.append(time.time() - start_time)
+
+			plt.figure()
+			plt.plot([1, 2, 4, 6], exec_times)
+			plt.xlabel('Number of qubits')
+			plt.ylabel('Execution time (in seconds)')
+			plt.title('Scalability as number of qubits grows for Grover on %s' % fn_name)
+			plt.savefig('grover_scalability_%s_{:%Y-%m-%d_%H-%M-%S}.png'.format(datetime.datetime.now()) % fn_name)
 

@@ -9,6 +9,7 @@ def one(x):
 
 # XNOR-reduce
 # balanced
+# Returns 1 when x has an odd number of 1's (same as XNOR-reduce)
 def xnor(x):
 	return sum(x) % 2
 
@@ -17,14 +18,10 @@ def xnor(x):
 def xor(x):
 	return (sum(x) + 1) % 2 
 
-	# Returns 1 only in the case that x is an n-bit string of all 1's
-def f(x):
+# Returns 1 only in the case that x is an n-bit string of all 1's
+def all_ones(x):
 	return int(sum(x) == len(x))
 
 # Returns 1 only in the case that x is an n-bit string of all 0's
-def g(x):
+def all_zeros(x):
 	return int(sum(x) == 0)
-
-# Returns 1 when x has an odd number of 1's (same as XNOR-reduce)
-def h(x):
-	return sum(x) % 2

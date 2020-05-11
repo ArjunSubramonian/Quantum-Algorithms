@@ -7,6 +7,7 @@ import sys
 import numpy as np
 import itertools
 import time
+import datetime
 import matplotlib.pyplot as plt
 import func
 from func import *
@@ -115,50 +116,30 @@ if __name__ == '__main__':
 		qc = get_qc('9q-square-qvm')
 		qc.compiler.client.timeout = 10000
 
-		start_time = time.time()
-		p = dj_program(get_U_f(func_in, n), n)
-		result = qc.run_and_measure(p, trials=trials)
-		print_results(func_in_name, result, time.time() - start_time, trials, n)
+		all_funcs = [(func_in, func_in_name), \
+									(zero, 'Constant 0'), \
+									(one, 'Constant 1'), \
+									(xor, 'XOR-reduce'), \
+									(xnor, 'XNOR-reduce')]
 
-		start_time = time.time()
-		p = dj_program(get_U_f(zero, n), n)
-		result = qc.run_and_measure(p, trials=trials)
-		print_results('Constant 0', result, time.time() - start_time, trials, n)
-
-		start_time = time.time()
-		p = dj_program(get_U_f(zero, n), n)
-		result = qc.run_and_measure(p, trials=trials)
-		print_results('Constant 0', result, time.time() - start_time, trials, n)
-
-		start_time = time.time()
-		p = dj_program(get_U_f(one, n), n)
-		result = qc.run_and_measure(p, trials=trials)
-		print_results('Constant 1', result, time.time() - start_time, trials, n)
-
-		start_time = time.time()
-		p = dj_program(get_U_f(xnor, n), n)
-		result = qc.run_and_measure(p, trials=trials)
-		print_results('XNOR-reduce', result, time.time() - start_time, trials, n)
-
-		start_time = time.time()
-		p = dj_program(get_U_f(xor, n), n)
-		result = qc.run_and_measure(p, trials=trials)
-		print_results('XOR-reduce', result, time.time() - start_time, trials, n)
-
-		exec_times = []
-		for n_test in [1, 2, 4]:
+		for fn, fn_name in all_funcs:
+			U_f = get_U_f(fn, n)
 			start_time = time.time()
-			p = dj_program(get_U_f(one, n_test), n_test)
-			result = qc.run_and_measure(p, trials=1)
-			exec_times.append(time.time() - start_time)
-		plt.plot([1, 2, 4], exec_times)
-		plt.xlabel('Number of qubits')
-		plt.ylabel('Execution time (in seconds)')
-		plt.title('Scalability as number of qubits grows')
-		# plt.savefig('deutsch_jozsa_scalability.png')
+			p = dj_program(U_f, n)
+			result = qc.run_and_measure(p, trials=trials)
+			print_results(fn_name, result, time.time() - start_time, trials, n)
 
+			exec_times = []
+			for n_test in [1, 2, 4]:
+				U_f = get_U_f(fn, n_test)
+				start_time = time.time()
+				p = dj_program(U_f, n_test)
+				result = qc.run_and_measure(p, trials=1)
+				exec_times.append(time.time() - start_time)
 
-
-
-		
-
+			plt.figure()
+			plt.plot([1, 2, 4], exec_times)
+			plt.xlabel('Number of qubits')
+			plt.ylabel('Execution time (in seconds)')
+			plt.title('Scalability as number of qubits grows for Deutsch-Jozsa on %s' % fn_name)
+			plt.savefig('deutsch_jozsa_scalability_%s_{:%Y-%m-%d_%H-%M-%S}.png'.format(datetime.datetime.now()) % fn_name)
