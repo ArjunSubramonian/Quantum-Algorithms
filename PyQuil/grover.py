@@ -9,22 +9,8 @@ import itertools
 import math
 import time
 import matplotlib.pyplot as plt 
-
-# Returns 1 only in the case that x is an n-bit string of all 1's
-def f(x):
-	return int(sum(x) == len(x))
-
-# Returns 1 only in the case that x is an n-bit string of all 0's
-def g(x):
-	return int(sum(x) == 0)
-
-# Returns 1 when x has an odd number of 1's (same as XNOR-reduce)
-def h(x):
-	return sum(x) % 2
-
-# Doesn't return 1 for any inputs (same as Constant 0)
-def zero(x):
-	return 0
+import func
+from func import *
 
 # Z_f is just a 2^n by 2^n diagonal matrix
 # the i-th entry in the diagonal corresponds to the 2^i-th possible n-bit input x and is equal to (-1)^f(x)
@@ -118,12 +104,22 @@ def print_results(test_name, func, result, exec_time, trials, n):
 
 # test driver
 if __name__ == '__main__':
-	n = int(sys.argv[1])
-	trials = int(sys.argv[2])
+	func_in_name = sys.argv[1]
+	try:
+	    func_in = getattr(func, func_in_name)
+	except AttributeError:
+	    raise NotImplementedError("Class `{}` does not implement `{}`".format(func.__class__.__name__, func_in_name))
+	n = int(sys.argv[2])
+	trials = int(sys.argv[3])
 
 	with local_forest_runtime():
 		qc = get_qc('9q-square-qvm')
 		qc.compiler.client.timeout = 10000
+
+		start_time = time.time()
+		p = grover_program(get_Z_f(func_in, n), get_Z_0(n), n)
+		result = qc.run_and_measure(p, trials=trials)
+		print_results(func_in_name, func_in, result, time.time() - start_time, trials, n)
 
 		start_time = time.time()
 		p = grover_program(get_Z_f(f, n), get_Z_0(n), n)
@@ -155,5 +151,5 @@ if __name__ == '__main__':
 		plt.xlabel('Number of qubits')
 		plt.ylabel('Execution time (in seconds)')
 		plt.title('Scalability as number of qubits grows')
-		plt.savefig('grover_scalability.png')
+		# plt.savefig('grover_scalability.png')
 

@@ -8,24 +8,8 @@ import numpy as np
 import itertools
 import time
 import matplotlib.pyplot as plt
-
-# constant 0 function
-def zero(x):
-	return 0
-
-# constant 1 function
-def one(x):
-	return 1
-
-# XNOR-reduce
-# balanced
-def xnor(x):
-	return sum(x) % 2
-
-# XOR-reduce
-# balanced
-def xor(x):
-	return (sum(x) + 1) % 2 
+import func
+from func import *
 
 # U_f | x > | b > = | x > | b + f(x) >
 # preserve the state of the first n qubits
@@ -119,12 +103,27 @@ def print_results(test_name, result, exec_time, trials, n):
 # failed with #1# = T.
 
 if __name__ == '__main__':
-	n = int(sys.argv[1])
-	trials = int(sys.argv[2])
+	func_in_name = sys.argv[1]
+	try:
+	    func_in = getattr(func, func_in_name)
+	except AttributeError:
+	    raise NotImplementedError("Class `{}` does not implement `{}`".format(func.__class__.__name__, func_in_name))
+	n = int(sys.argv[2])
+	trials = int(sys.argv[3])
 
 	with local_forest_runtime():
 		qc = get_qc('9q-square-qvm')
 		qc.compiler.client.timeout = 10000
+
+		start_time = time.time()
+		p = dj_program(get_U_f(func_in, n), n)
+		result = qc.run_and_measure(p, trials=trials)
+		print_results(func_in_name, result, time.time() - start_time, trials, n)
+
+		start_time = time.time()
+		p = dj_program(get_U_f(zero, n), n)
+		result = qc.run_and_measure(p, trials=trials)
+		print_results('Constant 0', result, time.time() - start_time, trials, n)
 
 		start_time = time.time()
 		p = dj_program(get_U_f(zero, n), n)
@@ -156,7 +155,7 @@ if __name__ == '__main__':
 		plt.xlabel('Number of qubits')
 		plt.ylabel('Execution time (in seconds)')
 		plt.title('Scalability as number of qubits grows')
-		plt.savefig('deutsch_jozsa_scalability.png')
+		# plt.savefig('deutsch_jozsa_scalability.png')
 
 
 
