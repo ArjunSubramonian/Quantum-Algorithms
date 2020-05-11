@@ -146,12 +146,12 @@ if __name__ == '__main__':
 		print_results("Constant 0", zero, result, time.time() - start_time, trials, n)
 
 		exec_times = []
-		for n_test in [1, 2, 4, 8]:
+		for n_test in [1, 2, 4]:
 			start_time = time.time()
 			p = grover_program(get_Z_f(f, n_test), get_Z_0(n_test), n_test)
 			result = qc.run_and_measure(p, trials=1)
 			exec_times.append(time.time() - start_time)
-		plt.plot([1, 2, 4, 8], exec_times)
+		plt.plot([1, 2, 4], exec_times)
 		plt.xlabel('Number of qubits')
 		plt.ylabel('Execution time (in seconds)')
 		plt.title('Scalability as number of qubits grows')
