@@ -117,11 +117,11 @@ if __name__ == '__main__':
 		qc = get_qc('9q-square-qvm')
 		qc.compiler.client.timeout = 10000
 
-		all_funcs = [(func_in, func_in_name), \
-									(all_ones, "All 1's"), \
-									(all_zeros, "All 0's"), \
-									(xnor, 'XNOR-reduce'), \
-									(zero, 'Constant 0')]
+		all_funcs = [(func_in, func_in_name)] #, \
+									# (all_ones, "All 1's"), \
+									# (all_zeros, "All 0's"), \
+									# (xnor, 'XNOR-reduce'), \
+									# (zero, 'Constant 0')]
 
 		for fn, fn_name in all_funcs:
 			Z_f = get_Z_f(fn, n)

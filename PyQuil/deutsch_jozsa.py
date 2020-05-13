@@ -94,15 +94,7 @@ def print_results(test_name, result, exec_time, trials, n):
 # Discuss whether different cases of U_f lead to different execution times.
 # What is your experience with scalability as n grows?  Present a diagram that maps n to execution time.
 
-# File "/Users/arjuns/Documents/UCLA/Classes/Spring 2020/CS 239/venv/lib/python3.6/site-packages/rpcq/_client.py", line 205, in call
-#     raise utils.RPCError(reply.error)
-# rpcq._utils.RPCError: Unhandled error in host program:
-# The assertion
-# (NOT
-#  #1=(TYPEP (FIRST (CL-QUIL::GOVERNED-QUEUE-CONTENTS CL-QUIL::SUBGOVERNOR))
-#            'CL-QUIL:APPLICATION))
-# failed with #1# = T.
-
+# test driver
 if __name__ == '__main__':
 	func_in_name = sys.argv[1]
 	try:
@@ -116,11 +108,11 @@ if __name__ == '__main__':
 		qc = get_qc('9q-square-qvm')
 		qc.compiler.client.timeout = 10000
 
-		all_funcs = [(func_in, func_in_name), \
-									(zero, 'Constant 0'), \
-									(one, 'Constant 1'), \
-									(xor, 'XOR-reduce'), \
-									(xnor, 'XNOR-reduce')]
+		all_funcs = [(func_in, func_in_name)] #, \
+									# (zero, 'Constant 0'), \
+									# (one, 'Constant 1'), \
+									# (xor, 'XOR-reduce'), \
+									# (xnor, 'XNOR-reduce')]
 
 		for fn, fn_name in all_funcs:
 			U_f = get_U_f(fn, n)
