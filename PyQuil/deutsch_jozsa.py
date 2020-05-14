@@ -133,7 +133,7 @@ if __name__ == '__main__':
 		if graph:
 			for fn, fn_name in all_funcs:
 				exec_times = []
-				for n_test in [int(arg) for arg in sys.argv[3:]]:
+				for n_test in sorted([int(arg) for arg in sys.argv[3:]]):
 					U_f = get_U_f(fn, n_test)
 					start_time = time.time()
 					p = dj_program(U_f, n_test)
@@ -141,7 +141,7 @@ if __name__ == '__main__':
 					exec_times.append(time.time() - start_time)
 
 				plt.figure()
-				plt.plot([int(arg) for arg in sys.argv[3:]], exec_times)
+				plt.plot(sorted([int(arg) for arg in sys.argv[3:]]), exec_times)
 				plt.xlabel('Number of qubits')
 				plt.ylabel('Execution time (in seconds)')
 				plt.title('Scalability as number of qubits grows for Deutsch-Jozsa on %s' % fn_name)
