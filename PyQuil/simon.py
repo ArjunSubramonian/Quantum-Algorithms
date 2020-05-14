@@ -130,57 +130,65 @@ def print_results(test_name, result, exec_time, n):
 
 
 if __name__ == '__main__':
+
+    if len(sys.argv) <= 1:
+        print('\nLook in func.py for a function name to pass in as an argument, followed by the length of the bit string and the number of trials.\nAlternatively, pass in the function name followed by \'--graph\' to create of graph of the scalability of the chosen function.\nRefer to README for additional info.\n')
+        exit()
+    graph = False
+    if sys.argv[2] == '--graph':
+        graph = True
+
     func_in_name = sys.argv[1]
     try:
         func_in = getattr(func, func_in_name)
     except AttributeError:
         raise NotImplementedError("Class `{}` does not implement `{}`".format(func.__class__.__name__, func_in_name))
     
-    n = int(sys.argv[2]) #if taking in n as an argument, set a single n_test value in the for loop below to n
+    if not graph:
+        n = int(sys.argv[2])
+        trials = int(sys.argv[3]) # number of 4-cycle iterations of circuit
 
-    trials = int(sys.argv[3]) # number of 4-cycle iterations of circuit
-
+   
     with local_forest_runtime():
         qc = get_qc('9q-square-qvm')
         qc.compiler.client.timeout = 10000
+        allzero_y = []
+        if (not graph):
+            exec_times = []
+            for n_test in [n]: 
 
- 
-        
-        exec_times = []
-        for n_test in [n]: 
-
-            rank = 0
-            list_indep_y = []
-            start_time = time.time()
-            for j in range(4*trials):
-                for iter in range(n_test-1):
+                rank = 0
+                list_indep_y = []
+                start_time = time.time()
+                for j in range(4*trials):
+                    for iter in range(n_test-1):
                 
-                    U_f = get_U_f(func_in, n_test)
-                    p = simon_program(U_f, n_test)
-                    result = qc.run_and_measure(p, 1)
+                        U_f = get_U_f(func_in, n_test)
+                        p = simon_program(U_f, n_test)
+                        result = qc.run_and_measure(p, 1)
                     
-                    print(result)
+                        print(result)
 
-                    #appending result to list of y's later to be used for solving for s
-                    #only append if result is not all 0s
-                    allzero = True
-                    for h in range(n_test):
-                        if result[h] == 1:
-                            allzero = False
-                            break
+                        #appending result to list of y's later to be used for solving for s
+                        #only append if result is not all 0s
+                        allzero = True
+                        for h in range(n_test):
+                            if result[h] == 1:
+                                allzero = False
+                                break
 
-                    if allzero == False:
-                        list_indep_y.append(result)
-                    else:
-                        allzero_y = result
+                        if allzero == False:
+                            list_indep_y.append(result)
+                        else:
+                            allzero_y = result
                     
-                #create matrix of y's
-                y_matrix = np.array(list_indep_y)
-                rank = np.linalg.matrix_rank(y_matrix)
+                    #create matrix of y's
+                    y_matrix = np.array(list_indep_y)
+                    rank = np.linalg.matrix_rank(y_matrix)
 
-                #stop iterating through loop setup once there are n-1 linearly independent y's
-                if rank == n_test-1:
-                    break
+                    #stop iterating through loop setup once there are n-1 linearly independent y's
+                    if rank == n_test-1:
+                        break
             
             #solve for s
             if rank == 0:
@@ -193,9 +201,52 @@ if __name__ == '__main__':
 
             print('s_test: ', s_test)
 
-        #plt.figure()
-        #plt.plot([2], exec_times)
-        #plt.xlabel('Number of qubits')
-        #plt.ylabel('Execution time (in seconds)')
-        #plt.title('Scalability as number of qubits grows for Simon on %s' % func_in_name)
-        #plt.savefig('simon_scalability_%s_{:%Y-%m-%d_%H-%M-%S}.png'.format(datetime.datetime.now()) % func_in_name)
+        if graph:
+            exec_times = []
+            trials = 5
+            for n_test in sorted([int(arg) for arg in sys.argv[3:]]): 
+                rank = 0
+                list_indep_y = []
+                start_time = time.time()
+                for j in range(4*trials):
+                    for iter in range(n_test-1):
+                
+                            U_f = get_U_f(func_in, n_test)
+                            p = simon_program(U_f, n_test)
+                            result = qc.run_and_measure(p, 1)
+
+                            #appending result to list of y's later to be used for solving for s
+                            #only append if result is not all 0s
+                            allzero = True
+                            for h in range(n_test):
+                                if result[h] == 1:
+                                    allzero = False
+                                    break
+
+                            if allzero == False:
+                                list_indep_y.append(result)
+                            else:
+                                allzero_y = result
+                    
+                    #create matrix of y's
+                    y_matrix = np.array(list_indep_y)
+                    rank = np.linalg.matrix_rank(y_matrix)
+
+                    #stop iterating through loop setup once there are n-1 linearly independent y's
+                    if rank == n_test-1:
+                        break
+            
+                #solve for s
+                if rank == 0:
+                    list_indep_y.append(allzero_y)
+                s_test = constraint_solver(list_indep_y, n_test)
+                timepassed = time.time() - start_time
+                exec_times.append(timepassed)
+
+                print('s_test: ', s_test)
+            plt.figure()
+            plt.plot(sorted([int(arg) for arg in sys.argv[3:]]), exec_times)
+            plt.xlabel('Number of qubits')
+            plt.ylabel('Execution time (in seconds)')
+            plt.title('Scalability as number of qubits grows for Simon on %s' % func_in_name)
+            plt.savefig('simon_scalability_%s_{:%Y-%m-%d_%H-%M-%S}.png'.format(datetime.datetime.now()) % func_in_name)
