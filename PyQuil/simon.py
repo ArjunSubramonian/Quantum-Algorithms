@@ -36,8 +36,17 @@ def get_U_f(f,n):
         func_input = inputs[0:n]
         b = inputs[n: 2*n]
         func_output = f(func_input)
+        #output = f(inputs)
+        
+        #for i in range(n):
+            #if output[i] == 0:
+                #U_f[(2 * n * idx) + 2*i, (2 * n * idx) + 2*i] = 1
+                #U_f[(2 * n * idx) + 2*i + 1, (2 * n * idx) + 2*i + 1] = 1
+            #else:
+                #U_f[(2 * n * idx) + 2*i, (2 * n * idx) + 2*i + 1] = 1
+                #U_f[(2 * n * idx) + 2*i + 1, (2 * n * idx) + 2*i] = 1
        
-        #f(x) mod2 b
+        #f(x) mod b 
         inputs = list(inputs)
         for j in range(n):
             if func_output[j] != b[j]:
@@ -46,6 +55,8 @@ def get_U_f(f,n):
                 inputs[n+j] = 0
         
         inputs = tuple(inputs)
+
+
         #note, first n bits of inputs remain unchanged
 
         output_dict.update({inputs: idx})
@@ -63,11 +74,7 @@ def get_U_f(f,n):
 def simon_program(U_f, n):
     p = Program()
 
-    # invert the helper qubits to 1
-    for a in range(n):
-        p += X(n + a - 1)
-
-	# apply Hadamard to all input qubits
+	# apply Hadamard to n qubits
     for i in range(n):
         p += H(i)
 
@@ -79,7 +86,7 @@ def simon_program(U_f, n):
 
 	# apply Hadamard to all input qubits
     for k in range(n):
-        p += H(i)
+        p += H(k)
 
 	# print(p)
     return p
@@ -97,7 +104,7 @@ def constraint_solver(list_y, n):
                 s[j] = 0
     #s only contains 1s in the indices all the other y's contain 0s
 
-    return s
+    return s 
 
 def print_results(test_name, result, exec_time, n):
 
@@ -148,30 +155,33 @@ if __name__ == '__main__':
  
         
         exec_times = []
-        for n_test in [1,2,3]: 
+        for n_test in [3]: 
 
-            start_time = time.time()
+            rank = 0
             list_indep_y = []
-
+            start_time = time.time()
             for j in range(4*trials):
                 for iter in range(n_test-1):
                 
                     U_f = get_U_f(func_in, n_test)
                     p = simon_program(U_f, n_test)
-                    
                     result = qc.run_and_measure(p, 1)
                     
-                    U_f = get_U_f(func_in, n_test)
-
-                    p = simon_program(U_f, n_test)
-                    result = qc.run_and_measure(p, trials=1)
-                    
-               
-                    #print(result)
+                    print(result)
 
                     #appending result to list of y's later to be used for solving for s
-                    list_indep_y.append(result)
+                    #only append if result is not all 0s
+                    allzero = True
+                    for h in range(n_test):
+                        if result[h] == 1:
+                            allzero = False
+                            break
 
+                    if allzero == False:
+                        list_indep_y.append(result)
+                    else:
+                        allzero_y = result
+                    
                 #create matrix of y's
                 y_matrix = np.array(list_indep_y)
                 rank = np.linalg.matrix_rank(y_matrix)
@@ -181,16 +191,19 @@ if __name__ == '__main__':
                     break
             
             #solve for s
+            if rank == 0:
+                list_indep_y.append(allzero_y)
             s_test = constraint_solver(list_indep_y, n_test)
+            timepassed = time.time() - start_time
+            exec_times.append(timepassed)
 
-            exec_times.append(time.time() - start_time)
-            print_results(n_test, s_test, time.time() - start_time, trials)
+            print_results(func_in_name, s_test, timepassed, n_test)
 
             print('s_test: ', s_test)
 
-        plt.figure()
-        plt.plot([1,2,3], exec_times)
-        plt.xlabel('Number of qubits')
-        plt.ylabel('Execution time (in seconds)')
-        plt.title('Scalability as number of qubits grows for Simon on %s' % fn_name)
-        plt.savefig('simon_scalability_%s_{:%Y-%m-%d_%H-%M-%S}.png'.format(datetime.datetime.now()) % fn_name)
+        #plt.figure()
+        #plt.plot([2], exec_times)
+        #plt.xlabel('Number of qubits')
+        #plt.ylabel('Execution time (in seconds)')
+        #plt.title('Scalability as number of qubits grows for Simon on %s' % func_in_name)
+        #plt.savefig('simon_scalability_%s_{:%Y-%m-%d_%H-%M-%S}.png'.format(datetime.datetime.now()) % func_in_name)
