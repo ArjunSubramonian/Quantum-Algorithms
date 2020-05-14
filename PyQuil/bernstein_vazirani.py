@@ -94,7 +94,7 @@ def print_results(test_name, result, exec_time, trials, n, b):
 
 if __name__ == '__main__':
 
-	if len(sys.argv) <= 1 or len(sys.argv) > 4:
+	if len(sys.argv) <= 2:
 		print('\nLook in func.py for a function name to pass in as an argument, followed by the length of the bit string and the number of trials.\nAlternatively, pass in the function name followed by \'--graph\' to create of graph of the scalability of the chosen function.\nRefer to README for additional info.\n')
 		exit()
 	graph = False
@@ -123,14 +123,20 @@ if __name__ == '__main__':
 		
 		if graph:
 			exec_times = []
-			for n_test in [1, 2, 3, 4]:
+			qubits = []
+			if len(sys.argv) > 3:
+				qubits = sorted(list(map(int, sys.argv[3:])))
+			else:
+				qubits = [1,2,3,4]
+			
+			for n_test in qubits:
 				U_f = get_U_f(func_in, n_test)
 				start_time = time.time()
 				p = bv_program(U_f, n_test)
 				result = qc.run_and_measure(p, trials=1)
 				exec_times.append(time.time() - start_time)
 			plt.figure()
-			plt.plot([1,2,3,4], exec_times)
+			plt.plot(qubits, exec_times)
 			plt.xlabel('Number of Qubits')
 			plt.ylabel('Execution time (sec)')
 			plt.title('Scalability of Bernstein-Vazirani on %s' % func_in_name)
