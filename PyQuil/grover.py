@@ -105,45 +105,56 @@ def print_results(test_name, func, result, exec_time, trials, n):
 
 # test driver
 if __name__ == '__main__':
+
+	if len(sys.argv) <= 1:
+		print('\nLook in func.py for a function name to pass in as an argument, followed by the length of the bit string and the number of trials.\nAlternatively, pass in the function name followed by \'--graph\' to create of graph of the scalability of the chosen function.\nRefer to README for additional info.\n')
+		exit()
+	graph = False
+	if sys.argv[2] == '--graph':
+		graph = True
 	func_in_name = sys.argv[1]
 	try:
 	    func_in = getattr(func, func_in_name)
 	except AttributeError:
 	    raise NotImplementedError("Class `{}` does not implement `{}`".format(func.__class__.__name__, func_in_name))
-	n = int(sys.argv[2])
-	trials = int(sys.argv[3])
+	if not graph:
+		n = int(sys.argv[2])
+		trials = int(sys.argv[3])
 
 	with local_forest_runtime():
-		qc = get_qc('9q-square-qvm')
+		qc = get_qc('16q-qvm', noisy = False)
 		qc.compiler.client.timeout = 10000
 
 		all_funcs = [(func_in, func_in_name)] #, \
-									# (all_ones, "All 1's"), \
-									# (all_zeros, "All 0's"), \
-									# (xnor, 'XNOR-reduce'), \
-									# (zero, 'Constant 0')]
+										# (all_ones, "All 1's"), \
+										# (all_zeros, "All 0's"), \
+										# (xnor, 'XNOR-reduce'), \
+										# (zero, 'Constant 0')]
 
-		for fn, fn_name in all_funcs:
-			Z_f = get_Z_f(fn, n)
-			Z_0 = get_Z_0(n)
-			start_time = time.time()
-			p = grover_program(Z_f, Z_0, n)
-			result = qc.run_and_measure(p, trials=trials)
-			print_results(fn_name, fn, result, time.time() - start_time, trials, n)
-
-			exec_times = []
-			for n_test in [1, 2, 4, 6]:
-				Z_f = get_Z_f(fn, n_test)
-				Z_0 = get_Z_0(n_test)
+		if not graph:
+			for fn, fn_name in all_funcs:
+				Z_f = get_Z_f(fn, n)
+				Z_0 = get_Z_0(n)
 				start_time = time.time()
-				p = grover_program(Z_f, Z_0, n_test)
-				result = qc.run_and_measure(p, trials=1)
-				exec_times.append(time.time() - start_time)
+				p = grover_program(Z_f, Z_0, n)
+				result = qc.run_and_measure(p, trials=trials)
+				print_results(fn_name, fn, result, time.time() - start_time, trials, n)
 
-			plt.figure()
-			plt.plot([1, 2, 4, 6], exec_times)
-			plt.xlabel('Number of qubits')
-			plt.ylabel('Execution time (in seconds)')
-			plt.title('Scalability as number of qubits grows for Grover on %s' % fn_name)
-			plt.savefig('grover_scalability_%s_{:%Y-%m-%d_%H-%M-%S}.png'.format(datetime.datetime.now()) % fn_name)
+		if graph:
+			for fn, fn_name in all_funcs:
+				exec_times = []
+				for n_test in [int(arg) for arg in sys.argv[3:]]:
+					Z_f = get_Z_f(fn, n_test)
+					Z_0 = get_Z_0(n_test)
+					start_time = time.time()
+					p = grover_program(Z_f, Z_0, n_test)
+					result = qc.run_and_measure(p, trials=1)
+					exec_times.append(time.time() - start_time)
+
+				plt.figure()
+				plt.plot([int(arg) for arg in sys.argv[3:]], exec_times)
+				plt.xlabel('Number of qubits')
+				plt.ylabel('Execution time (in seconds)')
+				plt.title('Scalability as number of qubits grows for Grover on %s' % fn_name)
+				plt.savefig('grover_scalability_%s_{:%Y-%m-%d_%H-%M-%S}.png'.format(datetime.datetime.now()) % fn_name)
 
