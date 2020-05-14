@@ -1,0 +1,27 @@
+## README
+
+Open the file "func.py,"" which is in the same directory as the quantum program files; it already comes with a lot of test functions. In this file, define the function(s) you want to input into any of the quantum algorithms. The function must take only one parameter, a list of bits, and it should return a value that aligns with the assumptions made by the algorithm you plan on using (e.g. for Grover, you should only return a single bit). Furthemore, the function may NOT make any assumptions about the length of the list of bits. This is an example:
+
+# constant 1 function
+def one(x):
+	return 1
+
+All quantum programs must be run from the command line, and they all take the same arguments. There are two options:
+
+python3 quantum_program.py	fn_name	n	trials
+
+where fn_name is the name of the function you want to input (exactly the same as in the definition in func.py), n is the number of qubits, and trials is the number of times you want to run the quantum circuit and measure the qubits. It is not required to manually start the PyQuil compiler and VM. This is an example for Deutsch-Jozsa:
+	
+python3 deutsch_jozsa.py one 4 10
+
+Each script runs the quantum circuit and measures the qubits for the specified function, number of qubits, and number of trials.  It then prints out the results; it clearly labels the test to which the trials correspond and the total execution time for the entire test (including all the trials), and subsequently, for each trial, presents 1) the actual measurements of the n input qubits and 2) the interpretation of the measurements.
+
+For simon.py, the trials option is used as m, which determines the number of iterations of the circuit to increase confidence in the results.  
+
+python3 quantum_program.py	fn_name	--graph	n_1	n_2	n_3 ... 
+
+Alternatively, each script also runs the quantum circuit for the provided function for the specified numbers of qubits and saves a plot of the execution time vs. the number of qubits to the same directory in which the quantum program files are. This is an example for Deutsch-Jozsa:
+
+python3 deutsch_jozsa.py one --graph 1 2 4
+
+We chose not to apply the --graph option to simon.py, since the trials option is used as m: a confidence measure. 
