@@ -16,12 +16,13 @@ from func import *
         
 # U_f | x > | b > = | x > | b + f(x) >
 # preserve the state of the first n qubits
-# if f(x) == 0, we preserve the state of the helper qubit b
-# otherwise, if f(x) == 1, we invert the state of the helper qubit
-# U_f is just a 2^n by 2^n matrix where the "diagonal" consists of 2 by 2 blocks that are either the identity or Pauli X
+# compute all possible bit strings of size 2*n and create dictionary of each input paired with its index
+# create another dictionary of each output value (f(x) mod2 b) paired with its index
+# U_f is just a 2^(2*n) by 2^(2*n) matrix where the "diagonal" consists of 2 by 2 blocks that are either the identity or Pauli X
 # the i-th diagonal block corresponds to the i-th possible n-bit input x_i to f
-## it is I if f(x_i) == 0
-## it is X if f(x_i) == 1      
+# The indices mapped to the input values represent the rows of U_f. 
+# Indices mapped to the output values represent the columns of U_f.
+# If the input and output of indices a and b are equal, the U_f[a][b] = 1    
 
 def get_U_f(f,n):
 
@@ -36,15 +37,6 @@ def get_U_f(f,n):
         func_input = inputs[0:n]
         b = inputs[n: 2*n]
         func_output = f(func_input)
-        #output = f(inputs)
-        
-        #for i in range(n):
-            #if output[i] == 0:
-                #U_f[(2 * n * idx) + 2*i, (2 * n * idx) + 2*i] = 1
-                #U_f[(2 * n * idx) + 2*i + 1, (2 * n * idx) + 2*i + 1] = 1
-            #else:
-                #U_f[(2 * n * idx) + 2*i, (2 * n * idx) + 2*i + 1] = 1
-                #U_f[(2 * n * idx) + 2*i + 1, (2 * n * idx) + 2*i] = 1
        
         #f(x) mod b 
         inputs = list(inputs)
@@ -155,7 +147,7 @@ if __name__ == '__main__':
  
         
         exec_times = []
-        for n_test in [3]: 
+        for n_test in [n]: 
 
             rank = 0
             list_indep_y = []
