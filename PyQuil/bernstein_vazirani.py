@@ -78,8 +78,6 @@ def print_results(test_name, result, exec_time, trials, n, b):
 	print()
 
 	for t in range(trials):
-			verdict = None
-
 			print('===================================')
 			print()
 			print('Trial', t + 1)
@@ -124,8 +122,12 @@ if __name__ == '__main__':
 		if graph:
 			exec_times = []
 			qubits = []
+			
+			# if the no. of test qubits are specified
 			if len(sys.argv) > 3:
 				qubits = sorted(list(map(int, sys.argv[3:])))
+			
+			# default is test on n = 1,2,3,4
 			else:
 				qubits = [1,2,3,4]
 			
