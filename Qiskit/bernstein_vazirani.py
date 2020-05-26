@@ -42,7 +42,7 @@ def get_U_f(f, n):
 	return U_f
 
 # generates the quantum circuit for Bernstein-Vazirani given U_f and n (the length of input bit strings)
-def bv_program(U_f, n):
+def bv_program(U_f, n, draw_circuit=False):
 	circuit = QuantumCircuit(n + 1, n)
 
 	# invert the helper qubit to make it 1
@@ -60,7 +60,8 @@ def bv_program(U_f, n):
 	for i in range(n):
 		circuit.h(i)
 
-	print(circuit_drawer(circuit, output='text'))
+	if draw_circuit:
+		print(circuit_drawer(circuit, output='text'))
 	return circuit
 
 # pretty print results
@@ -78,7 +79,8 @@ def print_results(test_name, result, trials, n, b):
 	print()
 
 	counts = result.get_counts(circuit)
-	for idx, key in enumerate(counts):
+	counts_sorted = sorted(counts.items(), key=lambda item: item[1], reverse=True)
+	for idx, (key, value) in enumerate(counts_sorted):
 			print('===================================')
 			print()
 			print('Result', idx + 1)
@@ -101,20 +103,23 @@ if __name__ == '__main__':
 		print('\nLook in func.py for a function name to pass in as an argument, followed by the length of the bit string and the number of trials.\nAlternatively, pass in the function name followed by \'--graph\' to create of graph of the scalability of the chosen function.\nRefer to README for additional info.\n')
 		exit()
 	graph = False
+	draw_circuit = False
 	if sys.argv[2] == '--graph':
 		graph = True
+	elif sys.argv[2] == '--draw':
+		draw_circuit = True
 	func_in_name = sys.argv[1]
 	try:
 		func_in = getattr(func, func_in_name)
 	except AttributeError:
 		raise NotImplementedError("Class `{}` does not implement `{}`".format(func.__class__.__name__, func_in_name))
-	if not graph:
+	if not graph and not draw_circuit:
 		n = int(sys.argv[2])
 		trials = int(sys.argv[3])
 
 	simulator = Aer.get_backend('qasm_simulator')
 		
-	if not graph:
+	if not graph and not draw_circuit:
 		b = func_in([0]*n)
 		U_f = get_U_f(func_in, n)
 		circuit = bv_program(U_f, n)
@@ -148,3 +153,6 @@ if __name__ == '__main__':
 		plt.ylabel('Execution time (sec)')
 		plt.title('Scalability of Bernstein-Vazirani on %s' % func_in_name)
 		plt.savefig('bernstein_vazirani_scalability_%s_{:%Y-%m-%d_%H-%M-%S}.png'.format(datetime.datetime.now()) % func_in_name)	
+
+	if draw_circuit:
+		bv_program(get_U_f(func_in, int(sys.argv[3])), int(sys.argv[3]), draw_circuit=True)
