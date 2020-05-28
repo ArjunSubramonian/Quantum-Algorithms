@@ -66,14 +66,15 @@ def bv_program(U_f, n, draw_circuit=False):
 	return circuit
 
 # pretty print results
-def print_results(test_name, result, trials, n, b):
+def print_results(test_name, result, total_time, trials, n, b):
 
 	print()
 	print()
 	print('===================================')
 	print()
 	print('Test:', test_name)
-	print('Execution time:', result.time_taken, 'sec')
+	print('Compile time:', total_time - result.time_taken, 'sec')
+	print('Run time:', result.time_taken, 'sec')
 	print()
 	print('===================================')
 	print('===================================')
@@ -95,8 +96,7 @@ def print_results(test_name, result, trials, n, b):
 			print()
 
 	plot_histogram(counts, title='Test: ' + test_name)
-	# plt.savefig('bernstein_vazirani_hist_%s_{:%Y-%m-%d_%H-%M-%S}.png'.format(datetime.datetime.now()) % test_name)	
-	plt.savefig('bernstein_vazirani_hist.png')
+	plt.savefig('bernstein_vazirani_hist_%s_{:%Y-%m-%d_%H-%M-%S}.png'.format(datetime.datetime.now()) % test_name)	
 
 if __name__ == '__main__':
 
@@ -109,6 +109,7 @@ if __name__ == '__main__':
 		graph = True
 	elif sys.argv[2] == '--draw':
 		draw_circuit = True
+
 	func_in_name = sys.argv[1]
 	try:
 		func_in = getattr(func, func_in_name)
@@ -122,20 +123,35 @@ if __name__ == '__main__':
 	if not graph and not draw_circuit:
 		n = int(sys.argv[2])
 		trials = int(sys.argv[3])
+		if len(sys.argv) > 4:
+			try:
+				optimization_level = int(sys.argv[4])
+				if optimization_level < 0 or optimization_level > 3:
+					print('\nOptimization level must be an integer between 0 and 3, inclusive. Higher levels generate more optimized circuits, at the expense of longer transpilation time.\n')
+			except:
+				print('\nOptimization level must be an integer between 0 and 3, inclusive. Higher levels generate more optimized circuits, at the expense of longer transpilation time.\n')
+				exit(1)
+		else:
+			optimization_level = 1
 
 	simulator = Aer.get_backend('qasm_simulator')
 		
 	if not graph and not draw_circuit:
+		plt.rcParams["axes.titlesize"] = 8
+
 		b = func_in([0]*n)
 		U_f = get_U_f(func_in, n)
+
+		start = time.time()
 		circuit = bv_program(U_f, n)
 		circuit.measure(range(n), range(n - 1, -1, -1))
-		job = execute(circuit, simulator, shots=trials)
+		job = execute(circuit, simulator, optimization_level=optimization_level, shots=trials)
 		result = job.result()
-		print_results(func_in_name, result, trials, n, b)
+		print_results(func_in_name, result, time.time() - start, trials, n, b)
 	
 	if graph:
-		exec_times = []
+		total_exec_times = [[], [], [], []]
+		run_times = [[], [], [], []]
 		qubits = []
 		
 		# if the no. of test qubits are specified
@@ -146,19 +162,32 @@ if __name__ == '__main__':
 		else:
 			qubits = [1,2,3,4]
 		
-		for n_test in qubits:
-			U_f = get_U_f(func_in, n_test)
-			start_time = time.time()
-			circuit = bv_program(U_f, n_test)
-			circuit.measure(range(n_test), range(n_test - 1, -1, -1))
-			job = execute(circuit, simulator, shots=1)
-			exec_times.append(job.result().time_taken)
-		plt.figure()
-		plt.plot(qubits, exec_times)
-		plt.xlabel('Number of Qubits')
-		plt.ylabel('Execution time (sec)')
-		plt.title('Scalability of Bernstein-Vazirani on %s' % func_in_name)
-		plt.savefig('bernstein_vazirani_scalability_%s_{:%Y-%m-%d_%H-%M-%S}.png'.format(datetime.datetime.now()) % func_in_name)	
+		for optimization_level in range(4):
+			for n_test in qubits:
+					U_f = get_U_f(func_in, n_test)
+
+					start = time.time()
+					circuit = bv_program(U_f, n_test)
+					circuit.measure(range(n_test), range(n_test - 1, -1, -1))
+					job = execute(circuit, simulator, optimization_level=optimization_level, shots=1)
+
+					run_times[optimization_level].append(time.time() - start)
+					total_exec_times[optimization_level].append(job.result().time_taken)
+
+		for optimization_level in range(4):
+			plt.figure()
+			plt.plot(qubits, np.array(total_exec_times[optimization_level]) - np.array(run_times[optimization_level]))
+			plt.xlabel('Number of Qubits')
+			plt.ylabel('Compile time (sec)')
+			plt.title('Compile time scalability of Bernstein-Vazirani on %s (optimization level = %d)' % (func_in_name, optimization_level))
+			plt.savefig('bernstein_vazirani_compile_scalability_%s_%dopt_{:%Y-%m-%d_%H-%M-%S}.png'.format(datetime.datetime.now()) % (func_in_name, optimization_level))
+
+			plt.figure()
+			plt.plot(qubits, run_times[optimization_level])
+			plt.xlabel('Number of Qubits')
+			plt.ylabel('Run time (sec)')
+			plt.title('Run time scalability of Bernstein-Vazirani on %s (optimization level = %d)' % (func_in_name, optimization_level))
+			plt.savefig('bernstein_vazirani_run_scalability_%s_%dopt_{:%Y-%m-%d_%H-%M-%S}.png'.format(datetime.datetime.now()) % (func_in_name, optimization_level))	
 
 	if draw_circuit:
 		bv_program(get_U_f(func_in, int(sys.argv[3])), int(sys.argv[3]), draw_circuit=True)
