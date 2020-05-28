@@ -1,3 +1,6 @@
+def bogus(a, b, c):
+  return -1
+
 # constant 0 function
 # Doesn't return 1 for any inputs (same as Constant 0)
 def zero(x):

@@ -4,6 +4,7 @@ from qiskit import(
   Aer)
 from qiskit.visualization import plot_histogram, circuit_drawer
 from qiskit.quantum_info.operators import Operator
+from inspect import signature
 
 import sys
 import numpy as np
@@ -101,7 +102,7 @@ if __name__ == '__main__':
 
 	if len(sys.argv) <= 2:
 		print('\nLook in func.py for a function name to pass in as an argument, followed by the length of the bit string and the number of trials.\nAlternatively, pass in the function name followed by \'--graph\' to create of graph of the scalability of the chosen function.\nRefer to README for additional info.\n')
-		exit()
+		exit(1)
 	graph = False
 	draw_circuit = False
 	if sys.argv[2] == '--graph':
@@ -113,6 +114,11 @@ if __name__ == '__main__':
 		func_in = getattr(func, func_in_name)
 	except AttributeError:
 		raise NotImplementedError("Class `{}` does not implement `{}`".format(func.__class__.__name__, func_in_name))
+	sig = signature(func_in)
+	if len(sig.parameters) != 1:
+		print('\nSpecified function must only accept a single parameter: a bit string passed in as a Python list. Refer to README for additional info.\n')  
+		exit(1)
+
 	if not graph and not draw_circuit:
 		n = int(sys.argv[2])
 		trials = int(sys.argv[3])
