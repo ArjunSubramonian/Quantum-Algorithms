@@ -86,7 +86,7 @@ def bitwise_gauss_elim(a):
     a = np.array(a)
     a %= 2
     a = a[a[:,0].argsort()][::-1]
-    n = len(a[0])
+    n = min(len(a[0]), len(a))
 
     for i in range(n):
         ind = i
@@ -170,26 +170,39 @@ if __name__ == '__main__':
         func_in = getattr(func, func_in_name)
     except AttributeError:
         raise NotImplementedError("Class `{}` does not implement `{}`".format(func.__class__.__name__, func_in_name))
+    sig = signature(func_in)
+    if len(sig.parameters) != 1:
+        print('\nSpecified function must only accept a single parameter: a bit string passed in as a Python list. Refer to README for additional info.\n')
+        exit(1)
     
-  
+    simulator = Aer.get_backend('qasm_simulator')
+    
     n = int(sys.argv[2])
     trials = int(sys.argv[3]) # number of 4-cycle iterations of circuit
-
-    simulator = Aer.get_backend('qasm_simulator')
+    if len(sys.argv) > 4:
+        try:
+            opt_level = int(sys.argv[4])
+            if opt_level < 0 or opt_level > 3:
+                print('\nOptimization level must be an integer between 0 and 3, inclusive. Higher levels generate more optimized circuits, at the expense of longer transpilation time.\n')
+        except:
+            print('\nOptimization level must be an integer between 0 and 3, inclusive. Higher levels generate more optimized circuits, at the expense of longer transpilation time.\n')
+            exit(1)
+    else:
+        opt_level = 1
    
-    allzero_y = []
-    exec_times = []
-
-    rank = 0
-    list_y = []
-    start_time = time.time()
-                
     U_f = get_U_f(func_in, n)
+    list_y = []        
+
+
     circuit = simon_program(U_f, n)
     circuit.measure(range(n), range(n))
-    job = execute(circuit, simulator, shots=4*trials*(n))
-    results = job.result()
-    counts = results.get_counts(circuit)
+    start = time.time()
+    circuit = transpile(circuit, basis_gates=['u1', 'u2', 'u3', 'cx'], optimization_level=opt_level)
+    transpiletime = time.time() - start
+    job = execute(circuit, simulator, optimization_level=0, shots=4*trials*(n))
+    result = job.result()
+    counts = result.get_counts(circuit)
+    runtime = result.time_taken
     for x in counts:
         list_y.append(list(map(int, list(x)))[::-1])
 
@@ -199,7 +212,7 @@ if __name__ == '__main__':
         s = s_test
     else:
         s = [0]*n
-    timepassed = time.time() - start_time
-    exec_times.append(timepassed)
 
-    print('s_test: ', s)
+    print('\n\nThe bit string s is: ', *s)
+    print('\nThe transpile time is: ', transpiletime, 's')
+    print('\nThe run time is: ', runtime, 's', '\n\n')
