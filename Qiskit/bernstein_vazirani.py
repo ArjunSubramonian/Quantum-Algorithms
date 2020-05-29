@@ -2,6 +2,7 @@ from qiskit import(
   QuantumCircuit,
   execute,
   Aer)
+from qiskit.compiler import transpile
 from qiskit.visualization import plot_histogram, circuit_drawer
 from qiskit.quantum_info.operators import Operator
 from inspect import signature
@@ -66,14 +67,14 @@ def bv_program(U_f, n, draw_circuit=False):
 	return circuit
 
 # pretty print results
-def print_results(test_name, result, total_time, trials, n, b):
+def print_results(test_name, result, transpile_time, trials, n, b):
 
 	print()
 	print()
 	print('===================================')
 	print()
 	print('Test:', test_name)
-	print('Compile time:', total_time - result.time_taken, 'sec')
+	print('Transpile time:', transpile_time, 'sec')
 	print('Run time:', result.time_taken, 'sec')
 	print()
 	print('===================================')
@@ -135,22 +136,22 @@ if __name__ == '__main__':
 			optimization_level = 1
 
 	simulator = Aer.get_backend('qasm_simulator')
-		
+	
 	if not graph and not draw_circuit:
-		plt.rcParams["axes.titlesize"] = 8
-
 		b = func_in([0]*n)
 		U_f = get_U_f(func_in, n)
 
-		start = time.time()
 		circuit = bv_program(U_f, n)
 		circuit.measure(range(n), range(n - 1, -1, -1))
-		job = execute(circuit, simulator, optimization_level=optimization_level, shots=trials)
-		result = job.result()
-		print_results(func_in_name, result, time.time() - start, trials, n, b)
+
+		start = time.time()
+		circuit = transpile(circuit, optimization_level=optimization_level)
+		end = time.time()
+		job = execute(circuit, simulator, optimization_level=0, shots=trials)
+		print_results(func_in_name, job.result(), end - start, trials, n, b)
 	
 	if graph:
-		total_exec_times = [[], [], [], []]
+		transpile_times = [[], [], [], []]
 		run_times = [[], [], [], []]
 		qubits = []
 		
@@ -166,28 +167,31 @@ if __name__ == '__main__':
 			for n_test in qubits:
 					U_f = get_U_f(func_in, n_test)
 
-					start = time.time()
 					circuit = bv_program(U_f, n_test)
 					circuit.measure(range(n_test), range(n_test - 1, -1, -1))
-					job = execute(circuit, simulator, optimization_level=optimization_level, shots=1)
 
-					run_times[optimization_level].append(time.time() - start)
-					total_exec_times[optimization_level].append(job.result().time_taken)
+					start = time.time()
+					circuit = transpile(circuit, optimization_level=optimization_level)
+					end = time.time()
+					job = execute(circuit, simulator, optimization_level=0, shots=1)
+
+					transpile_times[optimization_level].append(job.result().time_taken)
+					run_times[optimization_level].append(end - start)
 
 		for optimization_level in range(4):
 			plt.figure()
-			plt.plot(qubits, np.array(total_exec_times[optimization_level]) - np.array(run_times[optimization_level]))
+			plt.plot(qubits, transpile_times[optimization_level])
 			plt.xlabel('Number of Qubits')
-			plt.ylabel('Compile time (sec)')
-			plt.title('Compile time scalability of Bernstein-Vazirani on %s (optimization level = %d)' % (func_in_name, optimization_level))
-			plt.savefig('bernstein_vazirani_compile_scalability_%s_%dopt_{:%Y-%m-%d_%H-%M-%S}.png'.format(datetime.datetime.now()) % (func_in_name, optimization_level))
+			plt.ylabel('Transpile time (sec)')
+			plt.title('Transpile time scalability of Bernstein-Vazirani on %s\n(optimization level = %d)' % (func_in_name, optimization_level))
+			plt.savefig('bernstein_vazirani_transpile_scalability_%s_%dopt_{:%Y-%m-%d_%H-%M-%S}.png'.format(datetime.datetime.now()) % (func_in_name, optimization_level), fontsize=8)
 
 			plt.figure()
 			plt.plot(qubits, run_times[optimization_level])
 			plt.xlabel('Number of Qubits')
 			plt.ylabel('Run time (sec)')
-			plt.title('Run time scalability of Bernstein-Vazirani on %s (optimization level = %d)' % (func_in_name, optimization_level))
-			plt.savefig('bernstein_vazirani_run_scalability_%s_%dopt_{:%Y-%m-%d_%H-%M-%S}.png'.format(datetime.datetime.now()) % (func_in_name, optimization_level))	
+			plt.title('Run time scalability of Bernstein-Vazirani on %s\n(optimization level = %d)' % (func_in_name, optimization_level))
+			plt.savefig('bernstein_vazirani_run_scalability_%s_%dopt_{:%Y-%m-%d_%H-%M-%S}.png'.format(datetime.datetime.now()) % (func_in_name, optimization_level), fontsize=8)	
 
 	if draw_circuit:
 		bv_program(get_U_f(func_in, int(sys.argv[3])), int(sys.argv[3]), draw_circuit=True)
