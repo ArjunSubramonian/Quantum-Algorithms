@@ -2,8 +2,10 @@ from qiskit import(
     QuantumCircuit,
     execute,
     Aer)
+from qiskit.compiler import transpile
 from qiskit.visualization import plot_histogram, circuit_drawer
 from qiskit.quantum_info.operators import Operator
+from inspect import signature
 
 import math
 import sys
@@ -30,7 +32,7 @@ def get_Z_0(n):
 	return Z_0
 
 # generates the quantum circuit for Grover's algorithm given Z_f, Z_0, and n (the length of input bit strings)
-def grover_program(Z_f, Z_0, n):
+def grover_program(Z_f, Z_0, n, draw_circuit):
 
 	#q = QuantumRegister(n, 'q')
 	#c = QuantumRegister(n, 'c')
@@ -43,18 +45,17 @@ def grover_program(Z_f, Z_0, n):
 	# iterate floor of pi/4 * sqrt(2^n) times, as prescribed
 	# on each iteration, apply the G operator
 	for i in range(math.floor(math.pi / 4 * math.sqrt(2 ** n))):
-
 		# define the Z_f gate based on the unitary matrix returned by get_Z_f
 		Z_f_GATE = Operator(Z_f)
-		circuit.unitary(Z_f_GATE, range(n), label = 'Z_f')
+		circuit.unitary(Z_f_GATE, range(n-1, -1, -1), label = 'Z_f')
 
 		# apply Hadamard to all qubits
 		for j in range(n):
 			circuit.h(j)
 
-		# define the neg_I gate, which flips the sign of a qubit
+		# define the Z_0 gate based on the unitary matrix returned by get_Z_0
 		Z_0_GATE = Operator(Z_0)
-		circuit.unitary(Z_f_GATE, range(n), label = 'Z_0')
+		circuit.unitary(Z_f_GATE, range(n-1, -1, -1), label = 'Z_0')
 
         #apply Hadamard to all qubits
 		for j in range(n):
@@ -66,26 +67,29 @@ def grover_program(Z_f, Z_0, n):
 		NEG_I_GATE = Operator(-1 * np.eye(2**n))
 		circuit.unitary(NEG_I_GATE, range(n), label = 'neg_I_def')
 
-	print(circuit_drawer(circuit, output='text'))
+	if draw_circuit:
+		print(circuit_drawer(circuit, output='text'))
 	return circuit
 
 # pretty print results
-def print_results(test_name, result, trials, n):
+def print_results(test_name, result, transpile_time, trials, n):
 
 	print()
 	print()
 	print('===================================')
 	print()
 	print('Test:', test_name)
-	print('Execution time:', result.time_taken, 'sec')
+	print('Transpile time:', trasnpile_time, 'sec')
+	print('Run time:', result.time_taken, 'sec')
 	print()
 	print('===================================')
 	print('===================================')
 	print()
 
 	counts = result.get_counts(circuit)
+	counts_sorted = sorted(counts.items(), key=lambda item: item[1], reverse=True)
 
-	for idx, key in enumerate(counts):
+	for idx, (key,value) in enumerate(counts_sorted):
 			print('===================================')
 			print()
 			print('Result', idx + 1)
@@ -98,73 +102,121 @@ def print_results(test_name, result, trials, n):
 			print()
 
 	plot_histogram(counts, title='Test: ' + test_name)
-	# plt.savefig('bernstein_vazirani_hist_%s_{:%Y-%m-%d_%H-%M-%S}.png'.format(datetime.datetime.now()) % test_name)	
+	# plt.savefig('grover_hist_%s_{:%Y-%m-%d_%H-%M-%S}.png'.format(datetime.datetime.now()) % test_name)	
 	plt.savefig('grover_hist.png')
 
-# Discuss your effort to test the two programs and present results from the testing.
-# Discuss whether different cases of U_f lead to different execution times.
-# What is your experience with scalability as n grows?  Present a diagram that maps n to execution time.
-
-# test driver
 if __name__ == '__main__':
 
-	if len(sys.argv) <= 1:
+	if len(sys.argv) <= 2:
 		print('\nLook in func.py for a function name to pass in as an argument, followed by the length of the bit string and the number of trials.\nAlternatively, pass in the function name followed by \'--graph\' to create of graph of the scalability of the chosen function.\nRefer to README for additional info.\n')
-		exit()
+		exit(1)
 	graph = False
+	draw_circuit = False
 	if sys.argv[2] == '--graph':
 		graph = True
+	elif sys.argv[2] == '--draw':
+	    draw_circuit = True
+
 	func_in_name = sys.argv[1]
 	try:
 	    func_in = getattr(func, func_in_name)
 	except AttributeError:
 	    raise NotImplementedError("Class `{}` does not implement `{}`".format(func.__class__.__name__, func_in_name))
-	if not graph:
+	sig = signature(func_in)
+	if len(sig.parameters) != 1:
+		print('\nSpecified function must only accept a single parameter: a bit string passed in as a Python list. Refer to README for additional info.\n')  
+		exit(1)
+
+	if not graph and not draw_circuit:
 		n = int(sys.argv[2])
 		trials = int(sys.argv[3])
+		if len(sys.argv) > 4:
+			try:
+				optimization_level = int(sys.argv[4])
+				if optimization_level < 0 or optimization_level > 3:
+					print('\nOptimization level must be an integer between 0 and 3, inclusive. Higher levels generate more optimized circuits, at the expense of longer transpilation time.\n')
+					exit(1)
+			except:
+				print('\nOptimization level must be an integer between 0 and 3, inclusive. Higher levels generate more optimized circuits, at the expense of longer transpilation time.\n')
+				exit(1)
+		else:
+			optimization_level = 1
 
 	simulator = Aer.get_backend('qasm_simulator')
 
-	all_funcs = [(func_in, func_in_name)] #, \
-										# (all_ones, "All 1's"), \
-										# (all_zeros, "All 0's"), \
-										# (xnor, 'XNOR-reduce'), \
-										# (zero, 'Constant 0')]
-	if not graph:
-		for fn, fn_name in all_funcs:
-			Z_f = get_Z_f(fn, n)
-			Z_0 = get_Z_0(n)
-			circuit = grover_program(Z_f, Z_0, n)
-			circuit.measure(range(n), range(n)) # cbit?
-			job = execute(circuit, simulator, shots=trials)
-			result = job.result()
-			print_results(fn_name, result, trials, n)
+	
+	if not graph and not draw_circuit:
+		Z_f = get_Z_f(func_in, n)
+		Z_0 = get_Z_0(n)
+		circuit = grover_program(Z_f, Z_0, n, False)
+		circuit.measure(range(n), range(n-1, -1, -1))
+		start = time.time()
+
+        # gates available on IBMQX5
+		circuit = transpile(circuit, basis_gates=['u1', 'u2', 'u3', 'cx'], optimization_level=optimization_level)
+		end = time.time()
+		job = execute(circuit, simulator, shots=trials)
+		print_results(func_in_name, job.result(), end - start, trials, n)
 
 	if graph:
-		for fn, fn_name in all_funcs:
-			exec_times = []
-			qubits = []
-
-            # if the no. of test qubits are specified
-			if len(sys.argv) > 3:
-			    qubits = sorted(list(map(int, sys.argv[3:])))
+		transpile_times = [[], [], [], []]
+		run_times = [[], [], [], []]
+		qubits = []
 		
-		    # default is test on n = 1,2,3,4
-			else:
-			    qubits = [1,2,3,4,5,6]
+        # if the no. of test qubits are specified
+		if len(sys.argv) > 3:
+			qubits = sorted(list(map(int, sys.argv[3:])))
+		
+	    # default is test on n = 1,2,3,4
+		else:
+		    qubits = [1,2,3,4]
 
+		for optimization_level in range(4):
 			for n_test in qubits:
-				Z_f = get_Z_f(fn, n_test)
+				Z_f = get_Z_f(func_in, n_test)
 				Z_0 = get_Z_0(n_test)
-				circuit = grover_program(Z_f, Z_0, n_test)
-				circuit.measure(range(n_test), range(n_test))
-				job = execute(circuit, simulator, shots=1)
-				result = job.result()
-				exec_times.append(job.result().time_taken)
+				circuit = grover_program(Z_f, Z_0, n_test, False)
+				circuit.measure(range(n_test), range(n_test-1, -1, -1))
+
+				start = time.time()
+				# gates available on IBMQX5
+				circuit = transpile(circuit, basis_gates=['u1', 'u2', 'u3', 'cx'], optimization_level=optimization_level)
+				end = time.time()
+				job = execute(circuit, simulator, optimization_level=0, shots=1)
+
+				transpile_times[optimization_level].append(end - start)
+				run_times[optimization_level].append(job.result().time_taken)
+		
+
+		for optimization_level in range(4):
+			plt.figure()
+			plt.plot(qubits, transpile_times[optimization_level])
+			plt.xlabel('Number of Qubits')
+			plt.ylabel('Transpile time (sec)')
+			plt.title('Transpile time scalability of Grover on %s\n(optimization level = %d)' % (func_in_name, optimization_level))
+			plt.savefig('grover_transpile_scalability_%s_%dopt_{:%Y-%m-%d_%H-%M-%S}.png'.format(datetime.datetime.now()) % (func_in_name, optimization_level), fontsize=8)
 
 			plt.figure()
-			plt.plot(qubits, exec_times)
-			plt.xlabel('Number of qubits')
-			plt.ylabel('Execution time (sec)')
-			plt.title('Scalability as number of qubits grows for Grover on %s' % fn_name)
-			plt.savefig('grover_scalability_%s_{:%Y-%m-%d_%H-%M-%S}.png'.format(datetime.datetime.now()) % fn_name)
+			plt.plot(qubits, run_times[optimization_level])
+			plt.xlabel('Number of Qubits')
+			plt.ylabel('Run time (sec)')
+			plt.title('Run time scalability of Grover on %s\n(optimization level = %d)' % (func_in_name, optimization_level))
+			plt.savefig('grover_run_scalability_%s_%dopt_{:%Y-%m-%d_%H-%M-%S}.png'.format(datetime.datetime.now()) % (func_in_name, optimization_level), fontsize=8)	
+
+		fig, ax1 = plt.subplots()
+		ax1.set_xlabel('Qiskit optimization level')
+		ax1.set_ylabel('Transpile time (sec)')
+		ln1 = ax1.plot(range(4), [transpile_times[i][-1] for i in range(4)], 'r', label='transpile')
+
+		ax2 = ax1.twinx()  # instantiate a second axes that shares the same x-axis
+		ax2.set_ylabel('Run time (sec)') # we already handled the x-label with ax1
+		ln2 = ax2.plot(range(4), [run_times[i][-1] for i in range(4)], 'b', label='run')
+
+		fig.tight_layout()  # otherwise the right y-label is slightly clipped
+		plt.legend(ln1 + ln2, ['transpile', 'run'], loc=0)
+		plt.subplots_adjust(top=0.88)
+		plt.suptitle('Comparison of transpile and run times for Grover on %s\n(%d qubits)' % (func_in_name, qubits[-1]))
+		plt.savefig('grover_run_transpile_comp_%s_{:%Y-%m-%d_%H-%M-%S}.png'.format(datetime.datetime.now()) % func_in_name, fontsize=8)	
+
+	if draw_circuit:
+		grover_program(get_Z_f(func_in,  int(sys.argv[3])), get_Z_0(int(sys.argv[3])), int(sys.argv[3]), draw_circuit=True)
