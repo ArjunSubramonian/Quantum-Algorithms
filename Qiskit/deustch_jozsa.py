@@ -200,5 +200,18 @@ if __name__ == '__main__':
 			plt.title('Run time scalability of Deutsch-Jozsa on %s\n(optimization level = %d)' % (func_in_name, optimization_level))
 			plt.savefig('deutsch_jozsa_run_scalability_%s_%dopt_{:%Y-%m-%d_%H-%M-%S}.png'.format(datetime.datetime.now()) % (func_in_name, optimization_level), fontsize=8)	
 
+		fig, ax1 = plt.subplots()
+		ax1.set_xlabel('Qiskit optimization level')
+		ax1.set_ylabel('Transpile time (sec)')
+		ax1.plot(range(4), [transpile_times[i][-1] for i in range(4)])
+
+		ax2 = ax1.twinx()  # instantiate a second axes that shares the same x-axis
+		ax2.set_ylabel('Run time (sec)') # we already handled the x-label with ax1
+		ax2.plot(range(4), [run_times[i][-1] for i in range(4)])
+
+		fig.tight_layout()  # otherwise the right y-label is slightly clipped
+		plt.title('Comparison of transpile and run times for Deutsch-Jozsa on %s\n(%d qubits)' % (func_in_name, qubits[-1]))
+		plt.savefig('deutsch_jozsa_run_transpile_comp_%s_{:%Y-%m-%d_%H-%M-%S}.png'.format(datetime.datetime.now()) % func_in_name, fontsize=8)	
+
 	if draw_circuit:
 		dj_program(get_U_f(func_in, int(sys.argv[3])), int(sys.argv[3]), draw_circuit=True)
