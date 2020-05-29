@@ -203,13 +203,15 @@ if __name__ == '__main__':
 		fig, ax1 = plt.subplots()
 		ax1.set_xlabel('Qiskit optimization level')
 		ax1.set_ylabel('Transpile time (sec)')
-		ax1.plot(range(4), [transpile_times[i][-1] for i in range(4)])
+		ln1 = ax1.plot(range(4), [transpile_times[i][-1] for i in range(4)], 'r', label='transpile')
 
 		ax2 = ax1.twinx()  # instantiate a second axes that shares the same x-axis
 		ax2.set_ylabel('Run time (sec)') # we already handled the x-label with ax1
-		ax2.plot(range(4), [run_times[i][-1] for i in range(4)])
+		ln2 = ax2.plot(range(4), [run_times[i][-1] for i in range(4)], 'b', label='run')
 
 		fig.tight_layout()  # otherwise the right y-label is slightly clipped
+		plt.legend(ln1 + ln2, ['transpile', 'run'], loc=0)
+		plt.subplots_adjust(top=0.88)
 		plt.title('Comparison of transpile and run times for Deutsch-Jozsa on %s\n(%d qubits)' % (func_in_name, qubits[-1]))
 		plt.savefig('deutsch_jozsa_run_transpile_comp_%s_{:%Y-%m-%d_%H-%M-%S}.png'.format(datetime.datetime.now()) % func_in_name, fontsize=8)	
 
