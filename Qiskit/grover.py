@@ -32,7 +32,7 @@ def get_Z_0(n):
 	return Z_0
 
 # generates the quantum circuit for Grover's algorithm given Z_f, Z_0, and n (the length of input bit strings)
-def grover_program(Z_f, Z_0, n):
+def grover_program(Z_f, Z_0, n, draw_circuit):
 
 	#q = QuantumRegister(n, 'q')
 	#c = QuantumRegister(n, 'c')
@@ -67,7 +67,8 @@ def grover_program(Z_f, Z_0, n):
 		NEG_I_GATE = Operator(-1 * np.eye(2**n))
 		circuit.unitary(NEG_I_GATE, range(n), label = 'neg_I_def')
 
-	#print(circuit_drawer(circuit, output='text'))
+	if draw_circuit:
+		print(circuit_drawer(circuit, output='text'))
 	return circuit
 
 # pretty print results
@@ -147,7 +148,7 @@ if __name__ == '__main__':
 	if not graph and not draw_circuit:
 		Z_f = get_Z_f(func_in, n)
 		Z_0 = get_Z_0(n)
-		circuit = grover_program(Z_f, Z_0, n)
+		circuit = grover_program(Z_f, Z_0, n, False)
 		circuit.measure(range(n), range(n-1, -1, -1))
 		start = time.time()
 
@@ -174,7 +175,7 @@ if __name__ == '__main__':
 			for n_test in qubits:
 				Z_f = get_Z_f(func_in, n_test)
 				Z_0 = get_Z_0(n_test)
-				circuit = grover_program(Z_f, Z_0, n_test)
+				circuit = grover_program(Z_f, Z_0, n_test, False)
 				circuit.measure(range(n_test), range(n_test-1, -1, -1))
 
 				start = time.time()
