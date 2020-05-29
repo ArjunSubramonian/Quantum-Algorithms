@@ -137,6 +137,7 @@ if __name__ == '__main__':
 				optimization_level = int(sys.argv[4])
 				if optimization_level < 0 or optimization_level > 3:
 					print('\nOptimization level must be an integer between 0 and 3, inclusive. Higher levels generate more optimized circuits, at the expense of longer transpilation time.\n')
+					exit(1)
 			except:
 				print('\nOptimization level must be an integer between 0 and 3, inclusive. Higher levels generate more optimized circuits, at the expense of longer transpilation time.\n')
 				exit(1)
