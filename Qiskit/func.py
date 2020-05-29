@@ -57,10 +57,10 @@ def bottom_half(x):
 def top_half(x):
 	return sum(x[:(len(x)//2)]) % 2
 
-# The following function is designed to be used for Simon's algorithm
+# The following functions are designed to be used for Simon's algorithm
 def two_to_one(x):
     #most significant bit of s is 1
-    #if the most significant bit of x is 0, f(x) = s, otherwise f(x) = x^s
+    #if the most significant bit of x is 0, f(x) = x, otherwise f(x) = x^s
 
    if x[0] == 0:
        return x
@@ -84,3 +84,15 @@ def two_to_one(x):
            f_x.append(x[i])
            
    return f_x
+
+# s = 100...0
+def forget_first(x):
+  y = list(x)
+  y[0] = 0
+  return y
+
+# s = 00...01
+def forget_last(x):
+  y = list(x)
+  y[-1] = 0
+  return y

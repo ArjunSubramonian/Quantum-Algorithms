@@ -163,7 +163,7 @@ if __name__ == '__main__':
 
     if len(sys.argv) <= 1:
         print('\nLook in func.py for a function name to pass in as an argument, followed by the length of the bit string and the number of trials.\nRefer to README for additional info.\n')
-        exit()
+        exit(1)
 
     func_in_name = sys.argv[1]
     try:
@@ -174,45 +174,109 @@ if __name__ == '__main__':
     if len(sig.parameters) != 1:
         print('\nSpecified function must only accept a single parameter: a bit string passed in as a Python list. Refer to README for additional info.\n')
         exit(1)
-    
+
+
     simulator = Aer.get_backend('qasm_simulator')
-    
-    n = int(sys.argv[2])
-    trials = int(sys.argv[3]) # number of 4-cycle iterations of circuit
-    if len(sys.argv) > 4:
-        try:
-            opt_level = int(sys.argv[4])
-            if opt_level < 0 or opt_level > 3:
+
+    graph = False
+    draw = False
+    if sys.argv[2] == '--graph':
+        graph = True
+    if sys.argv[2] == '--draw':
+        draw = True
+
+    if not graph and not draw:
+        n = int(sys.argv[2])
+        trials = int(sys.argv[3]) # number of 4-cycle iterations of circuit
+        if len(sys.argv) > 4:
+            try:
+                opt_level = int(sys.argv[4])
+                if opt_level < 0 or opt_level > 3:
+                    print('\nOptimization level must be an integer between 0 and 3, inclusive. Higher levels generate more optimized circuits, at the expense of longer transpilation time.\n')
+                    exit(1)
+            except:
                 print('\nOptimization level must be an integer between 0 and 3, inclusive. Higher levels generate more optimized circuits, at the expense of longer transpilation time.\n')
-        except:
-            print('\nOptimization level must be an integer between 0 and 3, inclusive. Higher levels generate more optimized circuits, at the expense of longer transpilation time.\n')
-            exit(1)
-    else:
-        opt_level = 1
+                exit(1)
+        else:
+            opt_level = 1
    
-    U_f = get_U_f(func_in, n)
-    list_y = []        
+        U_f = get_U_f(func_in, n)
+        list_y = []
+        
+        circuit = simon_program(U_f, n)
+        circuit.measure(range(n), range(n))
+        start = time.time()
+        circuit = transpile(circuit, basis_gates=['u1', 'u2', 'u3', 'cx'], optimization_level=opt_level)
+        transpiletime = time.time() - start
+        job = execute(circuit, simulator, optimization_level=0, shots=4*trials*(n))
+        result = job.result()
+        counts = result.get_counts(circuit)
+        runtime = result.time_taken
+        for x in counts:
+            list_y.append(list(map(int, list(x)))[::-1])
 
+        #solve for s
+        s_test = constraint_solver(list_y, n)
+        if func_in(s_test) == func_in([0]*n):
+            s = s_test
+        else:
+            s = [0]*n
 
-    circuit = simon_program(U_f, n)
-    circuit.measure(range(n), range(n))
-    start = time.time()
-    circuit = transpile(circuit, basis_gates=['u1', 'u2', 'u3', 'cx'], optimization_level=opt_level)
-    transpiletime = time.time() - start
-    job = execute(circuit, simulator, optimization_level=0, shots=4*trials*(n))
-    result = job.result()
-    counts = result.get_counts(circuit)
-    runtime = result.time_taken
-    for x in counts:
-        list_y.append(list(map(int, list(x)))[::-1])
+        print('\n\nThe bit string s is: ', *s)
+        print('\nThe transpile time is: ', transpiletime, 's')
+        print('\nThe run time is: ', runtime, 's', '\n\n')
 
-    #solve for s
-    s_test = constraint_solver(list_y, n)
-    if func_in(s_test) == func_in([0]*n):
-        s = s_test
-    else:
-        s = [0]*n
+    if draw:
+        n = int(sys.argv[3])
+        U_f = get_U_f(func_in, n)
+        circuit = simon_program(U_f, n)
+        print(circuit_drawer(circuit, output='text'))
 
-    print('\n\nThe bit string s is: ', *s)
-    print('\nThe transpile time is: ', transpiletime, 's')
-    print('\nThe run time is: ', runtime, 's', '\n\n')
+    if graph:
+        transpile_times = [[], [], [], []]
+        run_times = [[], [], [], []]
+        qubits = [1,2,3,4]
+        
+        for opt_level in range(4):
+            for n in qubits:
+                U_f = get_U_f(func_in, n)
+                circuit = simon_program(U_f, n)
+                circuit.measure(range(n), range(n))
+                start = time.time()
+                circuit = transpile(circuit, basis_gates=['u1', 'u2', 'u3', 'cx'], optimization_level=opt_level)
+                transpiletime = time.time() - start
+                job = execute(circuit, simulator, optimization_level=0, shots=4*5*(n)) # m = 5 so probability of failure is < 1%
+                result = job.result()
+                runtime = result.time_taken
+
+                transpile_times[opt_level].append(transpiletime)
+                run_times[opt_level].append(runtime)
+                
+            plt.figure()
+            plt.plot(qubits, transpile_times[opt_level])
+            plt.xlabel('Number of Qubits')
+            plt.ylabel('Transpile Time (sec)')
+            plt.title('Transpile Time Scalability of Simon\'s on %s\n(optimization level = %d)' % (func_in_name, opt_level))
+            plt.savefig('simon_transpile_scalability_%s_%dopt_{:%Y-%m-%d_%H-%M-%S}.png'.format(datetime.datetime.now()) % (func_in_name, opt_level), fontsize=8)
+            
+            plt.figure()
+            plt.plot(qubits, run_times[opt_level])
+            plt.xlabel('Number of Qubits')
+            plt.ylabel('Run Time (sec)')
+            plt.title('Run Time Scalability of Simon\'s on %s\n(optimization level = %d)' % (func_in_name, opt_level))
+            plt.savefig('simon_run_scalability_%s_%dopt_{:%Y-%m-%d_%H-%M-%S}.png'.format(datetime.datetime.now()) % (func_in_name, opt_level), fontsize=8)
+
+        fig, ax1 = plt.subplots()
+        ax1.set_xlabel('Qiskit optimization level')
+        ax1.set_ylabel('Transpile time (sec)')
+        ln1 = ax1.plot(range(4), [transpile_times[i][-1] for i in range(4)], 'r', label='transpile')
+
+        ax2 = ax1.twinx()  # instantiate a second axes that shares the same x-axis
+        ax2.set_ylabel('Run time (sec)') # we already handled the x-label with ax1
+        ln2 = ax2.plot(range(4), [run_times[i][-1] for i in range(4)], 'b', label='run')
+
+        fig.tight_layout()  # otherwise the right y-label is slightly clipped
+        plt.legend(ln1 + ln2, ['transpile', 'run'], loc=0)
+        plt.subplots_adjust(top=0.88)
+        plt.suptitle('Comparison of transpile and run times for Simon\'s on %s\n(%d qubits)' % (func_in_name, qubits[-1]))
+        plt.savefig('simon_run_transpile_comp_%s_{:%Y-%m-%d_%H-%M-%S}.png'.format(datetime.datetime.now()) % func_in_name, fontsize=8)
