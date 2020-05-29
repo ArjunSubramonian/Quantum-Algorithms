@@ -2,8 +2,10 @@ from qiskit import(
   QuantumCircuit,
   execute,
   Aer)
+from qiskit.compiler import transpile
 from qiskit.visualization import plot_histogram, circuit_drawer
 from qiskit.quantum_info.operators import Operator
+from inspect import signature
 
 import sys
 import numpy as np
