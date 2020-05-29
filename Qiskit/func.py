@@ -96,3 +96,7 @@ def forget_last(x):
   y = list(x)
   y[-1] = 0
   return y
+
+# s = 00...0
+def identity(x):
+  return x
