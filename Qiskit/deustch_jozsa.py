@@ -182,8 +182,8 @@ if __name__ == '__main__':
 				end = time.time()
 				job = execute(circuit, simulator, optimization_level=0, shots=1)
 
-				transpile_times[optimization_level].append(job.result().time_taken)
-				run_times[optimization_level].append(end - start)
+				transpile_times[optimization_level].append(end - start)
+				run_times[optimization_level].append(job.result().time_taken)
 
 		for optimization_level in range(4):
 			plt.figure()
