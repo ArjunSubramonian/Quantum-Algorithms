@@ -57,11 +57,10 @@ def get_U_f(f,n):
                 U_f[ind2][ind1] = 1
                 break
  
-    print (U_f)
     return U_f
 
 def simon_program(U_f, n):
-    circuit = QuantumCircuit(2*n, 2*n)
+    circuit = QuantumCircuit(2*n, n)
 
     # apply Hadamard to n qubits
     for i in range(n):
@@ -69,7 +68,7 @@ def simon_program(U_f, n):
 
     # define the U_f gate based on the unitary matrix returned by get_U_f
     U_f_GATE = Operator(U_f)
-    circuit.unitary(U_f_GATE, range(2*n-1, -1, -1), label='U_f')
+    circuit.unitary(U_f_GATE, range(2*n-1,-1,-1), label='U_f')
     
     # apply Hadamard to all input qubits
     for k in range(n):
@@ -79,15 +78,49 @@ def simon_program(U_f, n):
     return circuit
 
 
+#returns nontrivial rows of rref of matrix of equations
+def bitwise_gauss_elim(a):
+    a = np.array(a)
+    a %= 2
+    a = a[a[:,0].argsort()][::-1]
+    n = len(a[0])
+
+    for i in range(n):
+        ind = i
+        while not a[i][ind]:
+            ind += 1
+            if ind >= n:
+                return a[:i]
+
+        for j in range(len(a)):
+            if j == i:
+                continue
+            if a[j][ind]:
+                a[j] += a[i]
+                a[j] %= 2
+
+        for k in range(n-1, -1, -1):
+            a = a[::-1]
+            a = a[a[:,k].argsort(kind='mergesort')][::-1]
+
+    return a[:n]
+
+
 #solve system of y's to determine s
 #list_y contains y's, n-1 of which are linearly independent
 def constraint_solver(list_y, n):
     # we need to solve the linear system given by y . s = 0, for n-1 equations
     s = [1] * n
-    for i in list_y:
+    ind_y = bitwise_gauss_elim(list_y)
+    for y in ind_y:
+        # if y has more than one 1
+        if np.sum(y)%2  == 0:
+            continue
+        
         for j in range(n):
-            if i[j]:
+            if y[j]:
                 s[j] = 0
+                break
     #s only contains 1s in the indices all the other y's contain 0s
 
     return s 
@@ -143,10 +176,10 @@ if __name__ == '__main__':
    
     allzero_y = []
     exec_times = []
-    for n_test in [n]: 
+    for n_test in [n]:
 
         rank = 0
-        list_indep_y = []
+        list_y = []
         start_time = time.time()
         for j in range(4*trials):
             for iter in range(n_test):
@@ -158,7 +191,6 @@ if __name__ == '__main__':
                 results = job.result()
                 counts = results.get_counts(circuit)
                 result_string = ''
-                print(counts)
                 for x in counts:
                     if counts[x]:
                         result_string = x
@@ -166,37 +198,17 @@ if __name__ == '__main__':
                 for a in result_string:
                     result.append(int(a))
                 result = result[::-1]
-                print(result)
-                print(circuit)
 
-                #print(result)
+                list_y.append(result)
 
-                #appending result to list of y's later to be used for solving for s
-                #only append if result is not all 0s
-                allzero = True
-                for h in range(n_test):
-                    if result[h] == 1:
-                        allzero = False
-                        break
-
-                    if allzero == False:
-                        list_indep_y.append(result)
-                    else:
-                        allzero_y = result
-                    
-            #create matrix of y's
-            y_matrix = np.array(list_indep_y)
-            rank = np.linalg.matrix_rank(y_matrix)
-
-            #stop iterating through loop setup once there are n-1 linearly independent y's
-            if rank == n_test-1:
-                break
             
     #solve for s
-    if rank == 0:
-        list_indep_y.append(allzero_y)
-    s_test = constraint_solver(list_indep_y, n_test)
+    s_test = constraint_solver(list_y, n_test)
+    if func_in(s_test) == func_in([0]*n):
+        s = s_test
+    else:
+        s = [0]*n
     timepassed = time.time() - start_time
     exec_times.append(timepassed)
 
-    print('s_test: ', s_test)
+    print('s_test: ', s)
