@@ -1,7 +1,10 @@
+# qiskit-specific libraries
 from qiskit import(QuantumCircuit, execute, Aer)
+from qiskit.compiler import transpile
 from qiskit.quantum_info.operators import Operator
 from qiskit.visualization import plot_histogram, circuit_drawer
 
+from inspect import signature
 import sys
 import numpy as np
 import itertools
@@ -57,11 +60,10 @@ def get_U_f(f,n):
                 U_f[ind2][ind1] = 1
                 break
  
-    print (U_f)
     return U_f
 
 def simon_program(U_f, n):
-    circuit = QuantumCircuit(2*n, 2*n)
+    circuit = QuantumCircuit(2*n, n)
 
     # apply Hadamard to n qubits
     for i in range(n):
@@ -69,7 +71,7 @@ def simon_program(U_f, n):
 
     # define the U_f gate based on the unitary matrix returned by get_U_f
     U_f_GATE = Operator(U_f)
-    circuit.unitary(U_f_GATE, range(2*n-1, -1, -1), label='U_f')
+    circuit.unitary(U_f_GATE, range(2*n-1,-1,-1), label='U_f')
     
     # apply Hadamard to all input qubits
     for k in range(n):
@@ -79,15 +81,49 @@ def simon_program(U_f, n):
     return circuit
 
 
+#returns nontrivial rows of rref of matrix of equations
+def bitwise_gauss_elim(a):
+    a = np.array(a)
+    a %= 2
+    a = a[a[:,0].argsort()][::-1]
+    n = min(len(a[0]), len(a))
+
+    for i in range(n):
+        ind = i
+        while not a[i][ind]:
+            ind += 1
+            if ind >= n:
+                return a[:i]
+
+        for j in range(len(a)):
+            if j == i:
+                continue
+            if a[j][ind]:
+                a[j] += a[i]
+                a[j] %= 2
+
+        for k in range(n-1, -1, -1):
+            a = a[::-1]
+            a = a[a[:,k].argsort(kind='mergesort')][::-1]
+
+    return a[:n]
+
+
 #solve system of y's to determine s
 #list_y contains y's, n-1 of which are linearly independent
 def constraint_solver(list_y, n):
     # we need to solve the linear system given by y . s = 0, for n-1 equations
     s = [1] * n
-    for i in list_y:
+    ind_y = bitwise_gauss_elim(list_y)
+    for y in ind_y:
+        # if y has more than one 1
+        if np.sum(y)%2  == 0:
+            continue
+        
         for j in range(n):
-            if i[j]:
+            if y[j]:
                 s[j] = 0
+                break
     #s only contains 1s in the indices all the other y's contain 0s
 
     return s 
@@ -134,69 +170,49 @@ if __name__ == '__main__':
         func_in = getattr(func, func_in_name)
     except AttributeError:
         raise NotImplementedError("Class `{}` does not implement `{}`".format(func.__class__.__name__, func_in_name))
+    sig = signature(func_in)
+    if len(sig.parameters) != 1:
+        print('\nSpecified function must only accept a single parameter: a bit string passed in as a Python list. Refer to README for additional info.\n')
+        exit(1)
     
-  
+    simulator = Aer.get_backend('qasm_simulator')
+    
     n = int(sys.argv[2])
     trials = int(sys.argv[3]) # number of 4-cycle iterations of circuit
-
-    simulator = Aer.get_backend('qasm_simulator')
+    if len(sys.argv) > 4:
+        try:
+            opt_level = int(sys.argv[4])
+            if opt_level < 0 or opt_level > 3:
+                print('\nOptimization level must be an integer between 0 and 3, inclusive. Higher levels generate more optimized circuits, at the expense of longer transpilation time.\n')
+        except:
+            print('\nOptimization level must be an integer between 0 and 3, inclusive. Higher levels generate more optimized circuits, at the expense of longer transpilation time.\n')
+            exit(1)
+    else:
+        opt_level = 1
    
-    allzero_y = []
-    exec_times = []
-    for n_test in [n]: 
+    U_f = get_U_f(func_in, n)
+    list_y = []        
 
-        rank = 0
-        list_indep_y = []
-        start_time = time.time()
-        for j in range(4*trials):
-            for iter in range(n_test):
-                
-                U_f = get_U_f(func_in, n_test)
-                circuit = simon_program(U_f, n)
-                circuit.measure(range(n), range(n))
-                job = execute(circuit, simulator, shots=1)
-                results = job.result()
-                counts = results.get_counts(circuit)
-                result_string = ''
-                print(counts)
-                for x in counts:
-                    if counts[x]:
-                        result_string = x
-                result = []
-                for a in result_string:
-                    result.append(int(a))
-                result = result[::-1]
-                print(result)
-                print(circuit)
 
-                #print(result)
+    circuit = simon_program(U_f, n)
+    circuit.measure(range(n), range(n))
+    start = time.time()
+    circuit = transpile(circuit, basis_gates=['u1', 'u2', 'u3', 'cx'], optimization_level=opt_level)
+    transpiletime = time.time() - start
+    job = execute(circuit, simulator, optimization_level=0, shots=4*trials*(n))
+    result = job.result()
+    counts = result.get_counts(circuit)
+    runtime = result.time_taken
+    for x in counts:
+        list_y.append(list(map(int, list(x)))[::-1])
 
-                #appending result to list of y's later to be used for solving for s
-                #only append if result is not all 0s
-                allzero = True
-                for h in range(n_test):
-                    if result[h] == 1:
-                        allzero = False
-                        break
-
-                    if allzero == False:
-                        list_indep_y.append(result)
-                    else:
-                        allzero_y = result
-                    
-            #create matrix of y's
-            y_matrix = np.array(list_indep_y)
-            rank = np.linalg.matrix_rank(y_matrix)
-
-            #stop iterating through loop setup once there are n-1 linearly independent y's
-            if rank == n_test-1:
-                break
-            
     #solve for s
-    if rank == 0:
-        list_indep_y.append(allzero_y)
-    s_test = constraint_solver(list_indep_y, n_test)
-    timepassed = time.time() - start_time
-    exec_times.append(timepassed)
+    s_test = constraint_solver(list_y, n)
+    if func_in(s_test) == func_in([0]*n):
+        s = s_test
+    else:
+        s = [0]*n
 
-    print('s_test: ', s_test)
+    print('\n\nThe bit string s is: ', *s)
+    print('\nThe transpile time is: ', transpiletime, 's')
+    print('\nThe run time is: ', runtime, 's', '\n\n')
