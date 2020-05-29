@@ -16,7 +16,6 @@ import matplotlib.pyplot as plt
 import func
 from func import *
 
-
 # U_f | x > | b > = | x > | b + f(x) >
 # preserve the state of the first n qubits
 # if f(x) == 0, we preserve the state of the helper qubit b
@@ -145,7 +144,8 @@ if __name__ == '__main__':
 		circuit.measure(range(n), range(n - 1, -1, -1))
 
 		start = time.time()
-		circuit = transpile(circuit, optimization_level=optimization_level)
+		# gates available on IBMQX5
+		circuit = transpile(circuit, basis_gates=['u1', 'u2', 'u3', 'cx'], optimization_level=optimization_level)
 		end = time.time()
 		job = execute(circuit, simulator, optimization_level=0, shots=trials)
 		print_results(func_in_name, job.result(), end - start, trials, n, b)
@@ -171,7 +171,8 @@ if __name__ == '__main__':
 					circuit.measure(range(n_test), range(n_test - 1, -1, -1))
 
 					start = time.time()
-					circuit = transpile(circuit, optimization_level=optimization_level)
+					# gates available on IBMQX5
+					circuit = transpile(circuit, basis_gates=['u1', 'u2', 'u3', 'cx'], optimization_level=optimization_level)
 					end = time.time()
 					job = execute(circuit, simulator, optimization_level=0, shots=1)
 

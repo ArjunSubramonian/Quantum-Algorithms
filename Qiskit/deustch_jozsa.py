@@ -42,7 +42,7 @@ def get_U_f(f, n):
 	return U_f
 
 # generates the quantum circuit for Deutsch-Jozsa given U_f and n (the length of input bit strings)
-def dj_program(U_f, n):
+def dj_program(U_f, n, draw_circuit=False):
 	circuit = QuantumCircuit(n + 1, n)
 
 	# invert the helper qubit to make it 1
@@ -60,38 +60,42 @@ def dj_program(U_f, n):
 	for i in range(n):
 		circuit.h(i)
 
-	print(circuit_drawer(circuit, output='text'))
+	if draw_circuit:
+		print(circuit_drawer(circuit, output='text'))
 	return circuit
 
 # pretty print results
-def print_results(test_name, result, trials, n, b):
+def print_results(test_name, result, transpile_time, trials, n):
 
 	print()
 	print()
 	print('===================================')
 	print()
 	print('Test:', test_name)
-	print('Execution time:', result.time_taken, 'sec')
+	print('Transpile time:', transpile_time, 'sec')
+	print('Run time:', result.time_taken, 'sec')
 	print()
 	print('===================================')
 	print('===================================')
 	print()
 
 	counts = result.get_counts(circuit)
-	for idx, key in enumerate(counts):
+	counts_sorted = sorted(counts.items(), key=lambda item: item[1], reverse=True)
+	for idx, (key, value) in enumerate(counts_sorted):
 			verdict = 'Constant!'
 			print('===================================')
 			print()
-			print('a is', key)
+			print('Result', idx + 1)
 			print('Frequency:', counts[key])
 
+			# Constant function if measure all 0's, balanced otherwise
 			for i in range(n):
-			    key = str(key)
 			    if key[i] != '0': 
 			        verdict = 'Balanced!'
 			        break
 
-			print(verdict)
+			print('Measurement:', key)
+			print('Function is:', verdict)
 
 			print()
 			print('===================================')
@@ -99,8 +103,7 @@ def print_results(test_name, result, trials, n, b):
 			print()
 
 	plot_histogram(counts, title='Test: ' + test_name)
-	# plt.savefig('deutsch_josza_hist_%s_{:%Y-%m-%d_%H-%M-%S}.png'.format(datetime.datetime.now()) % test_name)	
-	plt.savefig('deutsch_josza_hist.png')
+	plt.savefig('deutsch_jozsa_hist_%s_{:%Y-%m-%d_%H-%M-%S}.png'.format(datetime.datetime.now()) % test_name)
 
 if __name__ == '__main__':
 
@@ -108,30 +111,54 @@ if __name__ == '__main__':
 		print('\nLook in func.py for a function name to pass in as an argument, followed by the length of the bit string and the number of trials.\nAlternatively, pass in the function name followed by \'--graph\' to create of graph of the scalability of the chosen function.\nRefer to README for additional info.\n')
 		exit()
 	graph = False
+	draw_circuit = False
 	if sys.argv[2] == '--graph':
 		graph = True
+	elif sys.argv[2] == '--draw':
+		draw_circuit = True
+
 	func_in_name = sys.argv[1]
 	try:
 		func_in = getattr(func, func_in_name)
 	except AttributeError:
 		raise NotImplementedError("Class `{}` does not implement `{}`".format(func.__class__.__name__, func_in_name))
-	if not graph:
+	sig = signature(func_in)
+	if len(sig.parameters) != 1:
+		print('\nSpecified function must only accept a single parameter: a bit string passed in as a Python list. Refer to README for additional info.\n')  
+		exit(1)
+
+	if not graph and not draw_circuit:
 		n = int(sys.argv[2])
 		trials = int(sys.argv[3])
+		if len(sys.argv) > 4:
+			try:
+				optimization_level = int(sys.argv[4])
+				if optimization_level < 0 or optimization_level > 3:
+					print('\nOptimization level must be an integer between 0 and 3, inclusive. Higher levels generate more optimized circuits, at the expense of longer transpilation time.\n')
+			except:
+				print('\nOptimization level must be an integer between 0 and 3, inclusive. Higher levels generate more optimized circuits, at the expense of longer transpilation time.\n')
+				exit(1)
+		else:
+			optimization_level = 1
 
 	simulator = Aer.get_backend('qasm_simulator')
 		
-	if not graph:
-		b = func_in([0]*n)
+	if not graph and not draw_circuit:
 		U_f = get_U_f(func_in, n)
+
 		circuit = dj_program(U_f, n)
 		circuit.measure(range(n), range(n - 1, -1, -1))
-		job = execute(circuit, simulator, shots=trials)
-		result = job.result()
-		print_results(func_in_name, result, trials, n, b)
+
+		start = time.time()
+		# gates available on IBMQX5
+		circuit = transpile(circuit, basis_gates=['u1', 'u2', 'u3', 'cx'], optimization_level=optimization_level)
+		end = time.time()
+		job = execute(circuit, simulator, optimization_level=0, shots=trials)
+		print_results(func_in_name, job.result(), end - start, trials, n)
 	
 	if graph:
-		exec_times = []
+		transpile_times = [[], [], [], []]
+		run_times = [[], [], [], []]
 		qubits = []
 		
 		# if the no. of test qubits are specified
@@ -142,16 +169,36 @@ if __name__ == '__main__':
 		else:
 			qubits = [1,2,3,4]
 		
-		for n_test in qubits:
-			U_f = get_U_f(func_in, n_test)
-			start_time = time.time()
-			circuit = dj_program(U_f, n_test)
-			circuit.measure(range(n_test), range(n_test - 1, -1, -1))
-			job = execute(circuit, simulator, shots=1)
-			exec_times.append(job.result().time_taken)
-		plt.figure()
-		plt.plot(qubits, exec_times)
-		plt.xlabel('Number of Qubits')
-		plt.ylabel('Execution time (sec)')
-		plt.title('Scalability of Deutsch-Josza on %s' % func_in_name)
-		plt.savefig('deutsch_jozsa_scalability_%s_{:%Y-%m-%d_%H-%M-%S}.png'.format(datetime.datetime.now()) % func_in_name)
+		for optimization_level in range(4):
+			for n_test in qubits:
+				U_f = get_U_f(func_in, n_test)
+
+				circuit = dj_program(U_f, n_test)
+				circuit.measure(range(n_test), range(n_test - 1, -1, -1))
+
+				start = time.time()
+				# gates available on IBMQX5
+				circuit = transpile(circuit, basis_gates=['u1', 'u2', 'u3', 'cx'], optimization_level=optimization_level)
+				end = time.time()
+				job = execute(circuit, simulator, optimization_level=0, shots=1)
+
+				transpile_times[optimization_level].append(job.result().time_taken)
+				run_times[optimization_level].append(end - start)
+
+		for optimization_level in range(4):
+			plt.figure()
+			plt.plot(qubits, transpile_times[optimization_level])
+			plt.xlabel('Number of Qubits')
+			plt.ylabel('Transpile time (sec)')
+			plt.title('Transpile time scalability of Deutsch-Jozsa on %s\n(optimization level = %d)' % (func_in_name, optimization_level))
+			plt.savefig('deutsch_jozsa_transpile_scalability_%s_%dopt_{:%Y-%m-%d_%H-%M-%S}.png'.format(datetime.datetime.now()) % (func_in_name, optimization_level), fontsize=8)
+
+			plt.figure()
+			plt.plot(qubits, run_times[optimization_level])
+			plt.xlabel('Number of Qubits')
+			plt.ylabel('Run time (sec)')
+			plt.title('Run time scalability of Deutsch-Jozsa on %s\n(optimization level = %d)' % (func_in_name, optimization_level))
+			plt.savefig('deutsch_jozsa_run_scalability_%s_%dopt_{:%Y-%m-%d_%H-%M-%S}.png'.format(datetime.datetime.now()) % (func_in_name, optimization_level), fontsize=8)	
+
+	if draw_circuit:
+		dj_program(get_U_f(func_in, int(sys.argv[3])), int(sys.argv[3]), draw_circuit=True)
