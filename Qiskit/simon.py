@@ -1,7 +1,10 @@
+# qiskit-specific libraries
 from qiskit import(QuantumCircuit, execute, Aer)
+from qiskit.compiler import transpile
 from qiskit.quantum_info.operators import Operator
 from qiskit.visualization import plot_histogram, circuit_drawer
 
+from inspect import signature
 import sys
 import numpy as np
 import itertools
@@ -176,34 +179,22 @@ if __name__ == '__main__':
    
     allzero_y = []
     exec_times = []
-    for n_test in [n]:
 
-        rank = 0
-        list_y = []
-        start_time = time.time()
-        for j in range(4*trials):
-            for iter in range(n_test):
+    rank = 0
+    list_y = []
+    start_time = time.time()
                 
-                U_f = get_U_f(func_in, n_test)
-                circuit = simon_program(U_f, n)
-                circuit.measure(range(n), range(n))
-                job = execute(circuit, simulator, shots=1)
-                results = job.result()
-                counts = results.get_counts(circuit)
-                result_string = ''
-                for x in counts:
-                    if counts[x]:
-                        result_string = x
-                result = []
-                for a in result_string:
-                    result.append(int(a))
-                result = result[::-1]
+    U_f = get_U_f(func_in, n)
+    circuit = simon_program(U_f, n)
+    circuit.measure(range(n), range(n))
+    job = execute(circuit, simulator, shots=4*trials*(n))
+    results = job.result()
+    counts = results.get_counts(circuit)
+    for x in counts:
+        list_y.append(list(map(int, list(x)))[::-1])
 
-                list_y.append(result)
-
-            
     #solve for s
-    s_test = constraint_solver(list_y, n_test)
+    s_test = constraint_solver(list_y, n)
     if func_in(s_test) == func_in([0]*n):
         s = s_test
     else:
