@@ -5,7 +5,7 @@ from qiskit import(
   IBMQ,
   transpile,
   assemble)
-from qiskit.visualization import plot_histogram, circuit_drawer
+from qiskit.visualization import plot_histogram
 from qiskit.providers.ibmq import least_busy
 from qiskit.quantum_info.operators import Operator
 # Import measurement calibration functions
@@ -57,7 +57,7 @@ def get_U_f(f, n):
 	return U_f
 
 # generates the quantum circuit for Bernstein-Vazirani given U_f and n (the length of input bit strings)
-def bv_program(U_f, n, draw_circuit=False):
+def bv_program(U_f, n):
 	circuit = QuantumCircuit(n + 1, n)
 
 	# invert the helper qubit to make it 1
@@ -75,12 +75,10 @@ def bv_program(U_f, n, draw_circuit=False):
 	for i in range(n):
 		circuit.h(i)
 
-	if draw_circuit:
-		print(circuit_drawer(circuit, output='text'))
 	return circuit
 
 # pretty print results
-def print_results(test_name, results, meas_filter, transpile_time, trials, n, b):
+def print_results(test_name, circuit_size, results, meas_filter, transpile_time, trials, n, b):
 
 	print()
 	print()
@@ -88,7 +86,8 @@ def print_results(test_name, results, meas_filter, transpile_time, trials, n, b)
 	print()
 	print('Test:', test_name)
 	print('Transpile time:', transpile_time, 'sec')
-	print('Run time:', sum([result.time_taken for result in results]), 'sec')
+	print('Number of gates in transpiled circuit:', circuit_size)
+	print('Run time:', sum([result.time_taken for result in results]) / trials, 'sec')
 	print()
 	print('===================================')
 	print('===================================')
@@ -131,11 +130,8 @@ if __name__ == '__main__':
 		print('\nLook in func.py for a function name to pass in as an argument, followed by the length of the bit string and the number of trials.\nAlternatively, pass in the function name followed by \'--graph\' to create of graph of the scalability of the chosen function.\nRefer to README for additional info.\n')
 		exit(1)
 	graph = False
-	draw_circuit = False
 	if sys.argv[2] == '--graph':
 		graph = True
-	elif sys.argv[2] == '--draw':
-		draw_circuit = True
 
 	func_in_name = sys.argv[1]
 	try:
@@ -147,7 +143,7 @@ if __name__ == '__main__':
 		print('\nSpecified function must only accept a single parameter: a bit string passed in as a Python list. Refer to README for additional info.\n')  
 		exit(1)
 
-	if not graph and not draw_circuit:
+	if not graph:
 		n = int(sys.argv[2])
 		trials = int(sys.argv[3])
 		if len(sys.argv) > 4:
@@ -162,7 +158,7 @@ if __name__ == '__main__':
 		else:
 			optimization_level = 1
 	
-	if not graph and not draw_circuit:
+	if not graph:
 		b = func_in([0]*n)
 		U_f = get_U_f(func_in, n)
 
@@ -191,13 +187,15 @@ if __name__ == '__main__':
 		delayed_results = []
 		for j in jobs:
 			delayed_results.append(backend.retrieve_job(j.job_id()).result())
-		print_results(func_in_name, delayed_results, meas_fitter.filter, end - start, trials, n, b)
+		print_results(func_in_name, circuit.size(), delayed_results, meas_fitter.filter, end - start, trials, n, b)
 	
 	if graph:
 		sim_transpile_times = [[], [], [], []]
 		sim_run_times = [[], [], [], []]
+		sim_gates = [[], [], [], []]
 		qc_transpile_times = [[], [], [], []]
 		qc_run_times = [[], [], [], []]
+		qc_gates = [[], [], [], []]
 		qubits = []
 		
 		# if the no. of test qubits are specified
@@ -223,6 +221,7 @@ if __name__ == '__main__':
 
 					sim_transpile_times[optimization_level].append(end - start)
 					sim_run_times[optimization_level].append(job.result().time_taken)
+					sim_gates[optimization_level].append(circuit.size())
 
 					start = time.time()
 					circuit = transpile(circuit, backend, optimization_level=optimization_level)
@@ -232,24 +231,45 @@ if __name__ == '__main__':
 
 					qc_transpile_times[optimization_level].append(end - start)
 					qc_run_times[optimization_level].append(job.result().time_taken)
+					qc_gates[optimization_level].append(circuit.size())
 
 		for optimization_level in range(4):
-			plt.figure()
-			plt.plot(qubits, sim_transpile_times[optimization_level], label="QASM simulator")
-			plt.plot(qubits, qc_transpile_times[optimization_level], label=backend.name())
-			plt.xlabel('Number of Qubits')
-			plt.ylabel('Transpile time (sec)')
-			plt.legend()
-			plt.title('Transpile time scalability of Bernstein-Vazirani on %s\n(optimization level = %d)' % (func_in_name, optimization_level))
+			fig, ax1 = plt.subplots()
+			ln11 = ax1.plot(qubits, sim_transpile_times[optimization_level], 'r', label="QASM simulator")
+			ln12 = ax1.plot(qubits, qc_transpile_times[optimization_level], 'k', label=backend.name())
+			ax1.set_xlabel('Number of Qubits')
+			ax1.set_ylabel('Transpile time (sec)')
+
+			ax2 = ax1.twinx()  # instantiate a second axes that shares the same x-axis
+			ax2.set_ylabel('Number of gates') # we already handled the x-label with ax1
+			ln21 = ax2.plot(qubits, sim_gates[optimization_level], 'b', label='QASM simulator')
+			ln22 = ax2.plot(qubits, qc_gates[optimization_level], 'g', label=backend.name())
+
+			fig.tight_layout()  # otherwise the right y-label is slightly clipped
+			plt.legend(ln11 + ln12 + ln21 + ln22, ['QASM simulator transpile', backend.name() + ' transpile', 'QASM simulator #g', backend.name() + ' #g'], loc=0)
+			plt.subplots_adjust(top=0.88)
+
+			plt.suptitle('Transpile time scalability of Bernstein-Vazirani on %s\n(optimization level = %d)' % (func_in_name, optimization_level))
 			plt.savefig('bernstein_vazirani_transpile_scalability_%s_%dopt_{:%Y-%m-%d_%H-%M-%S}.png'.format(datetime.datetime.now()) % (func_in_name, optimization_level), fontsize=8)
 
-			plt.figure()
-			plt.plot(qubits, sim_run_times[optimization_level], label="QASM simulator")
-			plt.plot(qubits, qc_run_times[optimization_level], label=backend.name())
-			plt.xlabel('Number of Qubits')
-			plt.ylabel('Run time (sec)')
-			plt.legend()
-			plt.title('Run time scalability of Bernstein-Vazirani on %s\n(optimization level = %d)' % (func_in_name, optimization_level))
+			# ==========
+
+			fig, ax1 = plt.subplots()
+			ln11 = ax1.plot(qubits, sim_run_times[optimization_level], 'r', label="QASM simulator")
+			ln12 = ax1.plot(qubits, qc_run_times[optimization_level], 'k', label=backend.name())
+			ax1.set_xlabel('Number of Qubits')
+			ax1.set_ylabel('Run time (sec)')
+
+			ax2 = ax1.twinx()  # instantiate a second axes that shares the same x-axis
+			ax2.set_ylabel('Number of gates') # we already handled the x-label with ax1
+			ln21 = ax2.plot(qubits, sim_gates[optimization_level], 'b', label='QASM simulator')
+			ln22 = ax2.plot(qubits, qc_gates[optimization_level], 'g', label=backend.name())
+
+			fig.tight_layout()  # otherwise the right y-label is slightly clipped
+			plt.legend(ln11 + ln12 + ln21 + ln22, ['QASM simulator run', backend.name() + ' run', 'QASM simulator #g', backend.name() + ' #g'], loc=0)
+			plt.subplots_adjust(top=0.88)
+
+			plt.suptitle('Run time scalability of Bernstein-Vazirani on %s\n(optimization level = %d)' % (func_in_name, optimization_level))
 			plt.savefig('bernstein_vazirani_run_scalability_%s_%dopt_{:%Y-%m-%d_%H-%M-%S}.png'.format(datetime.datetime.now()) % (func_in_name, optimization_level), fontsize=8)	
 
 		fig, ax1 = plt.subplots()
@@ -268,6 +288,3 @@ if __name__ == '__main__':
 		plt.subplots_adjust(top=0.88)
 		plt.suptitle('Comparison of transpile and run times for Bernstein-Vazirani on %s\n(%d qubits)' % (func_in_name, qubits[-1]))
 		plt.savefig('bernstein_vazirani_run_transpile_comp_%s_{:%Y-%m-%d_%H-%M-%S}.png'.format(datetime.datetime.now()) % func_in_name, fontsize=8)	
-
-	if draw_circuit:
-		bv_program(get_U_f(func_in, int(sys.argv[3])), int(sys.argv[3]), draw_circuit=True)

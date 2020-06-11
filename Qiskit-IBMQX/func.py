@@ -35,7 +35,7 @@ def all_zeros(x):
 
 # Returns only first bit
 def first_bit(x):
-        return x[0]
+  return x[0]
 
 # Returns only last bit
 def last_bit(x):
@@ -43,7 +43,7 @@ def last_bit(x):
 
 #Returns sum of bit string plus 1 (mod 2)
 def add_one(x):
-        return (sum(x)+1)%2
+  return (sum(x)+1)%2
 
 #Returns sum of bit string (mod 2)
 def add(x):
