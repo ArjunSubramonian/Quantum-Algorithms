@@ -28,8 +28,7 @@ IBMQ.save_account(MY_API_KEY)
 provider = IBMQ.load_account()
 small_devices = provider.backends(filters=lambda x: x.configuration().n_qubits == 5
                                    and not x.configuration().simulator)
-#backend = least_busy(small_devices)
-backend = provider.get_backend('ibmq_london')
+backend = least_busy(small_devices)
 simulator = Aer.get_backend('qasm_simulator')
 
 # Z_f is just a 2^n by 2^n diagonal matrix
