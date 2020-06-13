@@ -297,3 +297,5 @@ if __name__ == '__main__':
 		plt.subplots_adjust(top=0.88)
 		plt.suptitle('Comparison of transpile and run times for Deutsch_Jozsa on %s\n(%d qubits)' % (func_in_name, qubits[-1]))
 		plt.savefig('deutsch_jozsa_run_transpile_comp_%s_{:%Y-%m-%d_%H-%M-%S}.png'.format(datetime.datetime.now()) % func_in_name, fontsize=8)	
+
+		
