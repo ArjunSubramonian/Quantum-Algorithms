@@ -29,6 +29,7 @@ provider = IBMQ.load_account()
 small_devices = provider.backends(filters=lambda x: x.configuration().n_qubits == 5
                                    and not x.configuration().simulator)
 backend = least_busy(small_devices)
+#backend = provider.get_backend('ibmq_london')
 simulator = Aer.get_backend('qasm_simulator')
 
 # Z_f is just a 2^n by 2^n diagonal matrix
@@ -256,7 +257,7 @@ if __name__ == '__main__':
 			plt.legend(ln11 + ln12 + ln21 + ln22, ['QASM simulator transpile', backend.name() + ' transpile', 'QASM simulator #g', backend.name() + ' #g'], loc=0)
 			plt.subplots_adjust(top=0.88)
 
-			plt.suptitle('Transpile time scalability of Grover on level = %d)' % (func_in_name, optimization_level))
+			plt.suptitle('Transpile time scalability of Grover on %s\n(optimization level = %d)' % (func_in_name, optimization_level))
 			plt.savefig('grover_transpile_scalability_%s_%dopt_{:%Y-%m-%d_%H-%M-%S}.png'.format(datetime.datetime.now()) % (func_in_name, optimization_level), fontsize=8)
 
 			# ==========
@@ -297,5 +298,4 @@ if __name__ == '__main__':
 		plt.savefig('grover_run_transpile_comp_%s_{:%Y-%m-%d_%H-%M-%S}.png'.format(datetime.datetime.now()) % func_in_name, fontsize=8)	
 
 
-		
 	
