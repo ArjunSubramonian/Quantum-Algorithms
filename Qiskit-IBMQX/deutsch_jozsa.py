@@ -22,12 +22,14 @@ import matplotlib.pyplot as plt
 import func
 from func import *
 
-MY_API_KEY = '2b55c94313fffa86ec98e01856e4103a98dcf2d356f83dc4c1378851e7e6e9c0753d2f222ca2b754e0fed6e629809a09f1ccdeb86e7f9b12e23b3ed715715c65'
+MY_API_KEY = '3224ec66230eb47e56751ea397ca13d9b8853315b92baeb9657ef48c97bb6a6827242c1487f95d68604f048f318b4273c530263dc8281addadb9d4c2e478e64c'
 IBMQ.save_account(MY_API_KEY)
 provider = IBMQ.load_account()
-small_devices = provider.backends(filters=lambda x: x.configuration().n_qubits == 5
-                                   and not x.configuration().simulator)
-backend = least_busy(small_devices)
+#small_devices = provider.backends(filters=lambda x: x.configuration().n_qubits == 5
+#                                   and not x.configuration().simulator)
+#backend = least_busy(small_devices)
+backend = provider.get_backend('ibmq_london')
+
 simulator = Aer.get_backend('qasm_simulator')
 
 # U_f | x > | b > = | x > | b + f(x) >
@@ -130,7 +132,7 @@ def print_results(test_name, circuit_size, results, meas_filter, transpile_time,
 
 	plot_histogram([counts, mitigated_counts], title=test_name, legend=['raw', 'mitigated'])
 	plt.axhline(1/(2 ** n), color='k', linestyle='dashed', linewidth=1)
-	plt.savefig('deutsch_jozsa_hist_%s_{:%Y-%m-%d_%H-%M-%S}.png'.format(datetime.datetime.now()) % test_name)	
+	plt.savefig('deutsch_jozsa_hist_%s_%d_{:%Y-%m-%d_%H-%M-%S}.png'.format(datetime.datetime.now()) % (test_name, trials),  bbox_inches = "tight")	
 
 if __name__ == '__main__':
 
