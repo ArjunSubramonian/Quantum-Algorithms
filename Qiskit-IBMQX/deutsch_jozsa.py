@@ -22,7 +22,7 @@ import matplotlib.pyplot as plt
 import func
 from func import *
 
-MY_API_KEY = '3224ec66230eb47e56751ea397ca13d9b8853315b92baeb9657ef48c97bb6a6827242c1487f95d68604f048f318b4273c530263dc8281addadb9d4c2e478e64c'
+MY_API_KEY = '2b55c94313fffa86ec98e01856e4103a98dcf2d356f83dc4c1378851e7e6e9c0753d2f222ca2b754e0fed6e629809a09f1ccdeb86e7f9b12e23b3ed715715c65'
 IBMQ.save_account(MY_API_KEY)
 provider = IBMQ.load_account()
 small_devices = provider.backends(filters=lambda x: x.configuration().n_qubits == 5
@@ -242,6 +242,10 @@ if __name__ == '__main__':
 					qc_run_times[optimization_level].append(job.result().time_taken)
 					qc_gates[optimization_level].append(circuit.size())
 
+        #for graphing, adjust array of qubit values to include the helper qubit
+		for i in range(len(qubits)):
+			qubits[i] += 1
+
 		for optimization_level in range(4):
 			fig, ax1 = plt.subplots()
 			ln11 = ax1.plot(qubits, sim_transpile_times[optimization_level], 'r', label="QASM simulator")
@@ -297,5 +301,3 @@ if __name__ == '__main__':
 		plt.subplots_adjust(top=0.88)
 		plt.suptitle('Comparison of transpile and run times for Deutsch_Jozsa on %s\n(%d qubits)' % (func_in_name, qubits[-1]))
 		plt.savefig('deutsch_jozsa_run_transpile_comp_%s_{:%Y-%m-%d_%H-%M-%S}.png'.format(datetime.datetime.now()) % func_in_name, fontsize=8)	
-
-		
