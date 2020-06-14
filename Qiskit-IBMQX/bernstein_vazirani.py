@@ -22,12 +22,13 @@ import matplotlib.pyplot as plt
 import func
 from func import *
 
-MY_API_KEY = '3224ec66230eb47e56751ea397ca13d9b8853315b92baeb9657ef48c97bb6a6827242c1487f95d68604f048f318b4273c530263dc8281addadb9d4c2e478e64c'
+MY_API_KEY = 'b5c51e6cadaa798d2ca5b21a97e287c2f861f054dde9ef8908feb2ff66dbcf8f6004608cb967de6edaf30ec8cf19991c09255d57bd54ae764f233b1feb4c9f52'
 IBMQ.save_account(MY_API_KEY)
 provider = IBMQ.load_account()
 small_devices = provider.backends(filters=lambda x: x.configuration().n_qubits == 5
                                    and not x.configuration().simulator)
 backend = least_busy(small_devices)
+# backend = provider.backends.ibmq_burlington
 simulator = Aer.get_backend('qasm_simulator')
 
 # U_f | x > | b > = | x > | b + f(x) >
@@ -204,8 +205,8 @@ if __name__ == '__main__':
 		
 		# default is test on n = 1,2,3
 		else:
-			qubits = [1,2,3]
-		
+			qubits = [1,2,3,4]
+
 		for optimization_level in range(4):
 			for n_test in qubits:
 					U_f = get_U_f(func_in, n_test)
@@ -218,7 +219,7 @@ if __name__ == '__main__':
 					circuit = transpile(circuit, basis_gates=['u1', 'u2', 'u3', 'cx'], optimization_level=optimization_level)
 					end = time.time()
 					job = execute(circuit, simulator, optimization_level=0, shots=1)
-
+					
 					sim_transpile_times[optimization_level].append(end - start)
 					sim_run_times[optimization_level].append(job.result().time_taken)
 					sim_gates[optimization_level].append(circuit.size())
@@ -226,12 +227,16 @@ if __name__ == '__main__':
 					start = time.time()
 					circuit = transpile(circuit, backend, optimization_level=optimization_level)
 					end = time.time()
-					job = execute(circuit, backend, optimization_level=0, shots=1)
-					delayed_result = backend.retrieve_job(job.job_id()).result()
+					try:
+						job = execute(circuit, backend, optimization_level=0, shots=1)
+						qc_run_times[optimization_level].append(job.result().time_taken)
+					except:
+						qc_run_times[optimization_level].append(float("NaN"))
 
 					qc_transpile_times[optimization_level].append(end - start)
-					qc_run_times[optimization_level].append(job.result().time_taken)
 					qc_gates[optimization_level].append(circuit.size())
+
+		qubits = [q + 1 for q in qubits]
 
 		for optimization_level in range(4):
 			fig, ax1 = plt.subplots()
