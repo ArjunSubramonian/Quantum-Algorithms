@@ -237,55 +237,103 @@ if __name__ == '__main__':
         else:
             s = [0]*n
 
-        print('\n\nThe bit string s is: ', *s)
+        print('\n\nThe number of gates in the transpiled circuit is: ', circuit.size())
+        print('\nThe bit string s is: ', *s)
         print('\nThe transpile time is: ', transpiletime, 's')
         print('\nThe run time is: ', runtime, 's', '\n\n')
 
     if graph:
-        transpile_times = [[], [], [], []]
-        run_times = [[], [], [], []]
-        qubits = [1,2,3,4]
+        sim_transpile_times = [[], [], [], []]
+        sim_run_times = [[], [], [], []]
+        sim_gates = [[], [], [], []]
+        
+        qc_transpile_times = [[], [], [], []]
+        qc_run_times = [[], [], [], []]
+        qc_gates = [[], [], [], []]
+        qubits = [1, 2]
         
         for opt_level in range(4):
             for n in qubits:
                 U_f = get_U_f(func_in, n)
                 circuit = simon_program(U_f, n)
                 circuit.measure(range(n), range(n))
-                start = time.time()
-                circuit = transpile(circuit, backend, optimization_level=opt_level)
-                transpiletime = time.time() - start
-                job = execute(circuit, backend, optimization_level=0, shots=4*5*(n)) # m = 5 so probability of failure is < 1%
-                result = backend.retrieve_job(job.job_id()).result()
-                runtime = result.time_taken
-
-                transpile_times[opt_level].append(transpiletime)
-                run_times[opt_level].append(runtime)
                 
-            plt.figure()
-            plt.plot(qubits, transpile_times[opt_level])
-            plt.xlabel('Number of Qubits')
-            plt.ylabel('Transpile Time (sec)')
-            plt.title('Transpile Time Scalability of Simon\'s on %s\n(optimization level = %d)' % (func_in_name, opt_level))
+                sim_start = time.time()
+                sim_circuit = transpile(circuit, simulator, optimization_level=opt_level)
+                sim_transpiletime = time.time() - sim_start
+                sim_job = execute(sim_circuit, simulator, optimization_level=0, shots=4*5*n) # m = 5 so probability of failure is < 1%
+                sim_result = sim_job.result()
+                sim_runtime = sim_result.time_taken
+
+                sim_transpile_times[opt_level].append(sim_transpiletime)
+                sim_run_times[opt_level].append(sim_runtime)
+                sim_gates[opt_level].append(sim_circuit.size())
+
+                qc_start = time.time()
+                qc_circuit = transpile(circuit, backend, optimization_level=opt_level)
+                qc_transpiletime = time.time() - qc_start
+                qc_runtime = -1
+                try:
+                    qc_job = execute(qc_circuit, backend, optimization_level=0, shots=4*5*n)
+                    qc_result = qc_job.result()
+                    qc_runtime = qc_result.time_taken
+                except:
+                    qc_runtime = float("NaN")
+
+                qc_transpile_times[opt_level].append(qc_transpiletime)
+                qc_run_times[opt_level].append(qc_runtime)
+                qc_gates[opt_level].append(qc_circuit.size())
+
+            fig, ax1 = plt.subplots()
+            ln11 = ax1.plot(qubits, sim_transpile_times[opt_level], 'r', label="QASM simulator")
+            ln12 = ax1.plot(qubits, qc_transpile_times[opt_level], 'k', label=backend.name())
+            ax1.set_xlabel('Number of Qubits')
+            ax1.set_ylabel('Transpile time (sec)')
+
+            ax2 = ax1.twinx()  # instantiate a second axes that shares the same x-axis
+            ax2.set_ylabel('Number of gates') # we already handled the x-label with ax1
+            ln21 = ax2.plot(qubits, sim_gates[opt_level], 'b', label='QASM simulator')
+            ln22 = ax2.plot(qubits, qc_gates[opt_level], 'g', label=backend.name())
+
+            fig.tight_layout()  # otherwise the right y-label is slightly clipped
+            plt.legend(ln11 + ln12 + ln21 + ln22, ['QASM simulator transpile', backend.name() + ' transpile', 'QASM simulator #g', backend.name() + ' #g'], loc=0)
+            plt.subplots_adjust(top=0.88)
+
+            plt.suptitle('Transpile time scalability of Simon\'s on %s\n(optimization level = %d)' % (func_in_name, opt_level))
             plt.savefig('simon_transpile_scalability_%s_%dopt_{:%Y-%m-%d_%H-%M-%S}.png'.format(datetime.datetime.now()) % (func_in_name, opt_level), fontsize=8)
-            
-            plt.figure()
-            plt.plot(qubits, run_times[opt_level])
-            plt.xlabel('Number of Qubits')
-            plt.ylabel('Run Time (sec)')
-            plt.title('Run Time Scalability of Simon\'s on %s\n(optimization level = %d)' % (func_in_name, opt_level))
+
+
+            fig, ax1 = plt.subplots()
+            ln11 = ax1.plot(qubits, sim_run_times[opt_level], 'r', label="QASM simulator")
+            ln12 = ax1.plot(qubits, qc_run_times[opt_level], 'k', label=backend.name())
+            ax1.set_xlabel('Number of Qubits')
+            ax1.set_ylabel('Run time (sec)')
+
+            ax2 = ax1.twinx()  # instantiate a second axes that shares the same x-axis
+            ax2.set_ylabel('Number of gates') # we already handled the x-label with ax1
+            ln21 = ax2.plot(qubits, sim_gates[opt_level], 'b', label='QASM simulator')
+            ln22 = ax2.plot(qubits, qc_gates[opt_level], 'g', label=backend.name())
+
+            fig.tight_layout()  # otherwise the right y-label is slightly clipped
+            plt.legend(ln11 + ln12 + ln21 + ln22, ['QASM simulator run', backend.name() + ' run', 'QASM simulator #g', backend.name() + ' #g'], loc=0)
+            plt.subplots_adjust(top=0.88)
+
+            plt.suptitle('Run time scalability of Simon\'s on %s\n(optimization level = %d)' % (func_in_name, opt_level))
             plt.savefig('simon_run_scalability_%s_%dopt_{:%Y-%m-%d_%H-%M-%S}.png'.format(datetime.datetime.now()) % (func_in_name, opt_level), fontsize=8)
 
         fig, ax1 = plt.subplots()
         ax1.set_xlabel('Qiskit optimization level')
         ax1.set_ylabel('Transpile time (sec)')
-        ln1 = ax1.plot(range(4), [transpile_times[i][-1] for i in range(4)], 'r', label='transpile')
+        ln11 = ax1.plot(range(4), [sim_transpile_times[i][-1] for i in range(4)], 'r', label='QASM simulator transpile')
+        ln12 = ax1.plot(range(4), [qc_transpile_times[i][-1] for i in range(4)], 'k', label=backend.name() + ' transpile')
 
         ax2 = ax1.twinx()  # instantiate a second axes that shares the same x-axis
         ax2.set_ylabel('Run time (sec)') # we already handled the x-label with ax1
-        ln2 = ax2.plot(range(4), [run_times[i][-1] for i in range(4)], 'b', label='run')
+        ln21 = ax2.plot(range(4), [sim_run_times[i][-1] for i in range(4)], 'b', label='QASM simulator run')
+        ln22 = ax2.plot(range(4), [qc_run_times[i][-1] for i in range(4)], 'g', label=backend.name() + ' run')
 
         fig.tight_layout()  # otherwise the right y-label is slightly clipped
-        plt.legend(ln1 + ln2, ['transpile', 'run'], loc=0)
+        plt.legend(ln11 + ln12 + ln21 + ln22, ['QASM simulator transpile', backend.name() + ' transpile', 'QASM simulator run', backend.name() + ' run'], loc=0)
         plt.subplots_adjust(top=0.88)
         plt.suptitle('Comparison of transpile and run times for Simon\'s on %s\n(%d qubits)' % (func_in_name, qubits[-1]))
         plt.savefig('simon_run_transpile_comp_%s_{:%Y-%m-%d_%H-%M-%S}.png'.format(datetime.datetime.now()) % func_in_name, fontsize=8)
