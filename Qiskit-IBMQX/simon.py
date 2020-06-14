@@ -148,10 +148,8 @@ if __name__ == '__main__':
         exit(1)
 
 
-    MY_API_KEY = '3224ec66230eb47e56751ea397ca13d9b8853315b92baeb9657ef48c97bb6a6827242c1487f95d68604f048f318b4273c530263dc8281addadb9d4c2e478e64c'
-    IBMQ.save_account(MY_API_KEY)
     provider = IBMQ.load_account()
-    backend = provider.get_backend('ibmq_16_melbourne')
+    backend = provider.get_backend('ibmq_london')
     simulator = Aer.get_backend('qasm_simulator')
 
     graph = False
@@ -179,13 +177,56 @@ if __name__ == '__main__':
         
         circuit = simon_program(U_f, n)
         circuit.measure(range(n), range(n))
+
+        # Calibration Matrix
+        meas_calibs, state_labels = complete_meas_cal(qubit_list=range(n), circlabel='mcal')
+        cal_job = execute(meas_calibs, backend=backend, shots=8192)
+        cal_results = cal_job.result()
+        meas_fitter = CompleteMeasFitter(cal_results, state_labels, circlabel='mcal')
+        
         start = time.time()
         circuit = transpile(circuit, backend, optimization_level=opt_level)
         transpiletime = time.time() - start
-        job = execute(circuit, simulator, optimization_level=0, shots=4*trials*(n))
-        result = job.result()
-        counts = result.get_counts(circuit)
-        runtime = result.time_taken
+
+        if trials*n > 2048:
+            trial_list = [8192]*((trials*n)//2048) + [(4*trials*n)%8192]
+        else:
+            trial_list = [4*trials*n]
+        
+        job = []
+        for t in trial_list:
+            job.append(execute(circuit, backend, optimization_level=0, shots=t))
+
+        result = []
+        for j in job:
+            result.append(backend.retrieve_job(j.job_id()).result())
+
+        counts = {}
+        for r in result:
+            r_count = r.get_counts(circuit)
+            for key in r_count:
+                if key in counts:
+                    counts[key] += r_count[key]
+                else:
+                    counts[key] = r_count[key]
+
+        meas_filter = meas_fitter.filter
+        mitigated_result = [meas_filter.apply(r) for r in result]
+        
+        mitigated_counts = {}
+        for mr in mitigated_result:
+            mr_count = mr.get_counts(0)
+            for key in mr_count:
+                if key in mitigated_counts:
+                    mitigated_counts[key] += mr_count[key]
+                else:
+                    mitigated_counts[key] = mr_count[key]
+
+        plot_histogram([counts, mitigated_counts], title=func_in_name, legend=['raw', 'mitigated'])
+        plt.axhline(1/(2 ** n), color='k', linestyle='dashed', linewidth=1)
+        plt.savefig('simon_hist_%s_{:%Y-%m-%d_%H-%M-%S}.png'.format(datetime.datetime.now()) % func_in_name, bbox_inches = 'tight')
+
+        runtime = sum([r.time_taken for r in result])/(4*trials*n)
         for x in counts:
             list_y.append(list(map(int, list(x)))[::-1])
 
@@ -211,7 +252,7 @@ if __name__ == '__main__':
                 circuit = simon_program(U_f, n)
                 circuit.measure(range(n), range(n))
                 start = time.time()
-                circuit = transpile(circuit, basis_gates=['u1', 'u2', 'u3', 'cx'], optimization_level=opt_level)
+                circuit = transpile(circuit, backend, optimization_level=opt_level)
                 transpiletime = time.time() - start
                 job = execute(circuit, backend, optimization_level=0, shots=4*5*(n)) # m = 5 so probability of failure is < 1%
                 result = backend.retrieve_job(job.job_id()).result()
