@@ -22,13 +22,13 @@ import matplotlib.pyplot as plt
 import func
 from func import *
 
-MY_API_KEY = '3224ec66230eb47e56751ea397ca13d9b8853315b92baeb9657ef48c97bb6a6827242c1487f95d68604f048f318b4273c530263dc8281addadb9d4c2e478e64c'
-IBMQ.save_account(MY_API_KEY)
+# MY_API_KEY = '' <-- ENTER KEY
+# IBMQ.save_account(MY_API_KEY)
 provider = IBMQ.load_account()
-#small_devices = provider.backends(filters=lambda x: x.configuration().n_qubits == 5
-#                                   and not x.configuration().simulator)
-#backend = least_busy(small_devices)
-backend = provider.get_backend('ibmq_london')
+small_devices = provider.backends(filters=lambda x: x.configuration().n_qubits == 5
+                                   and not x.configuration().simulator)
+backend = least_busy(small_devices)
+#backend = provider.get_backend('ibmq_london')
 
 simulator = Aer.get_backend('qasm_simulator')
 
