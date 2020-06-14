@@ -23,14 +23,13 @@ import matplotlib.pyplot as plt
 import func
 from func import *
 
-MY_API_KEY = '2b55c94313fffa86ec98e01856e4103a98dcf2d356f83dc4c1378851e7e6e9c0753d2f222ca2b754e0fed6e629809a09f1ccdeb86e7f9b12e23b3ed715715c65'
-
+MY_API_KEY = ''
 IBMQ.save_account(MY_API_KEY)
 provider = IBMQ.load_account()
 small_devices = provider.backends(filters=lambda x: x.configuration().n_qubits == 5
                                    and not x.configuration().simulator)
 backend = least_busy(small_devices)
-#backend = provider.get_backend('ibmq_ourense')
+#backend = provider.get_backend('ibmq_london')
 simulator = Aer.get_backend('qasm_simulator')
 
 # Z_f is just a 2^n by 2^n diagonal matrix
@@ -59,14 +58,10 @@ def grover_program(Z_f, Z_0, n):
 		circuit.h(i)
 
 	Z_f_GATE = Operator(Z_f)
-	#circuit.unitary(Z_f_GATE, range(n-1, -1, -1), label = 'Z_f')
 
 	Z_0_GATE = Operator(Z_0)
-	#circuit.unitary(Z_f_GATE, range(n-1, -1, -1), label = 'Z_0')
 
 	NEG_I_GATE = Operator(-1 * np.eye(2**n))
-	#circuit.unitary(NEG_I_GATE, range(n), label = 'neg_I_def')
-
 
 	# iterate floor of pi/4 * sqrt(2^n) times, as prescribed
 	# on each iteration, apply the G operator
