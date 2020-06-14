@@ -23,13 +23,14 @@ import matplotlib.pyplot as plt
 import func
 from func import *
 
-MY_API_KEY = '3224ec66230eb47e56751ea397ca13d9b8853315b92baeb9657ef48c97bb6a6827242c1487f95d68604f048f318b4273c530263dc8281addadb9d4c2e478e64c'
+MY_API_KEY = '2b55c94313fffa86ec98e01856e4103a98dcf2d356f83dc4c1378851e7e6e9c0753d2f222ca2b754e0fed6e629809a09f1ccdeb86e7f9b12e23b3ed715715c65'
+
 IBMQ.save_account(MY_API_KEY)
 provider = IBMQ.load_account()
 small_devices = provider.backends(filters=lambda x: x.configuration().n_qubits == 5
                                    and not x.configuration().simulator)
 backend = least_busy(small_devices)
-#backend = provider.get_backend('ibmq_london')
+#backend = provider.get_backend('ibmq_ourense')
 simulator = Aer.get_backend('qasm_simulator')
 
 # Z_f is just a 2^n by 2^n diagonal matrix
@@ -57,11 +58,21 @@ def grover_program(Z_f, Z_0, n):
 	for i in range(n):
 		circuit.h(i)
 
+	Z_f_GATE = Operator(Z_f)
+	#circuit.unitary(Z_f_GATE, range(n-1, -1, -1), label = 'Z_f')
+
+	Z_0_GATE = Operator(Z_0)
+	#circuit.unitary(Z_f_GATE, range(n-1, -1, -1), label = 'Z_0')
+
+	NEG_I_GATE = Operator(-1 * np.eye(2**n))
+	#circuit.unitary(NEG_I_GATE, range(n), label = 'neg_I_def')
+
+
 	# iterate floor of pi/4 * sqrt(2^n) times, as prescribed
 	# on each iteration, apply the G operator
 	for i in range(math.floor(math.pi / 4 * math.sqrt(2 ** n))):
 		# define the Z_f gate based on the unitary matrix returned by get_Z_f
-		Z_f_GATE = Operator(Z_f)
+		#Z_f_GATE = Operator(Z_f)
 		circuit.unitary(Z_f_GATE, range(n-1, -1, -1), label = 'Z_f')
 
 		# apply Hadamard to all qubits
@@ -69,7 +80,7 @@ def grover_program(Z_f, Z_0, n):
 			circuit.h(j)
 
 		# define the Z_0 gate based on the unitary matrix returned by get_Z_0
-		Z_0_GATE = Operator(Z_0)
+		#Z_0_GATE = Operator(Z_0)
 		circuit.unitary(Z_f_GATE, range(n-1, -1, -1), label = 'Z_0')
 
         #apply Hadamard to all qubits
@@ -79,13 +90,13 @@ def grover_program(Z_f, Z_0, n):
 		# define the neg_I gate, which flips the sign of a qubit
 	    # achieves multiplication by -1 in the G operator (as defined in the lecture notes)
 	    # not necessary, since global phases are irrelevant, but just for consistency with lecture notes
-		NEG_I_GATE = Operator(-1 * np.eye(2**n))
+		#NEG_I_GATE = Operator(-1 * np.eye(2**n))
 		circuit.unitary(NEG_I_GATE, range(n), label = 'neg_I_def')
 
 		return circuit
 
 # pretty print results
-def print_results(test_name, result, transpile_time, trials, n):
+def print_results(test_name, circuit_size, results, meas_filter, transpile_time, trials, n):
 
 	print()
 	print()
@@ -126,7 +137,7 @@ def print_results(test_name, result, transpile_time, trials, n):
 
 	plot_histogram([counts, mitigated_counts], title=test_name, legend=['raw', 'mitigated'])
 	plt.axhline(1/(2 ** n), color='k', linestyle='dashed', linewidth=1)
-	plt.savefig('grover_hist_%s_{:%Y-%m-%d_%H-%M-%S}.png'.format(datetime.datetime.now()) % test_name)	
+	plt.savefig('grover_hist_%s_{:%Y-%m-%d_%H-%M-%S}.png'.format(datetime.datetime.now()) % test_name, bbox_inches = "tight")	
 
 if __name__ == '__main__':
 
@@ -191,7 +202,7 @@ if __name__ == '__main__':
 		delayed_results = []
 		for j in jobs:
 			delayed_results.append(backend.retrieve_job(j.job_id()).result())
-		print_results(func_in_name, delayed_results, meas_fitter.filter, end - start, trials, n)
+		print_results(func_in_name, circuit.size(), delayed_results, meas_fitter.filter, end - start, trials, n)
 
 
 	if graph:
