@@ -23,8 +23,8 @@ import matplotlib.pyplot as plt
 import func
 from func import *
 
-MY_API_KEY = ''
-IBMQ.save_account(MY_API_KEY)
+#MY_API_KEY = '' <-- ENTER KEY
+#IBMQ.save_account(MY_API_KEY)
 provider = IBMQ.load_account()
 small_devices = provider.backends(filters=lambda x: x.configuration().n_qubits == 5
                                    and not x.configuration().simulator)
@@ -57,25 +57,27 @@ def grover_program(Z_f, Z_0, n):
 	for i in range(n):
 		circuit.h(i)
 
+    # define the Z_f gate based on the unitary matrix returned by get_Z_f
 	Z_f_GATE = Operator(Z_f)
 
+    # define the Z_0 gate based on the unitary matrix returned by get_Z_0
 	Z_0_GATE = Operator(Z_0)
 
+    # define the neg_I gate, which flips the sign of a qubit
 	NEG_I_GATE = Operator(-1 * np.eye(2**n))
 
 	# iterate floor of pi/4 * sqrt(2^n) times, as prescribed
 	# on each iteration, apply the G operator
 	for i in range(math.floor(math.pi / 4 * math.sqrt(2 ** n))):
-		# define the Z_f gate based on the unitary matrix returned by get_Z_f
-		#Z_f_GATE = Operator(Z_f)
+
+        #apply the Z_f gate
 		circuit.unitary(Z_f_GATE, range(n-1, -1, -1), label = 'Z_f')
 
 		# apply Hadamard to all qubits
 		for j in range(n):
 			circuit.h(j)
 
-		# define the Z_0 gate based on the unitary matrix returned by get_Z_0
-		#Z_0_GATE = Operator(Z_0)
+        #apply the Z_0 gate
 		circuit.unitary(Z_f_GATE, range(n-1, -1, -1), label = 'Z_0')
 
         #apply Hadamard to all qubits
@@ -85,7 +87,6 @@ def grover_program(Z_f, Z_0, n):
 		# define the neg_I gate, which flips the sign of a qubit
 	    # achieves multiplication by -1 in the G operator (as defined in the lecture notes)
 	    # not necessary, since global phases are irrelevant, but just for consistency with lecture notes
-		#NEG_I_GATE = Operator(-1 * np.eye(2**n))
 		circuit.unitary(NEG_I_GATE, range(n), label = 'neg_I_def')
 
 		return circuit
@@ -132,7 +133,7 @@ def print_results(test_name, circuit_size, results, meas_filter, transpile_time,
 
 	plot_histogram([counts, mitigated_counts], title=test_name, legend=['raw', 'mitigated'])
 	plt.axhline(1/(2 ** n), color='k', linestyle='dashed', linewidth=1)
-	plt.savefig('grover_hist_%s_{:%Y-%m-%d_%H-%M-%S}.png'.format(datetime.datetime.now()) % test_name, bbox_inches = "tight")	
+	plt.savefig('grover_hist_%s_%d_{:%Y-%m-%d_%H-%M-%S}.png'.format(datetime.datetime.now()) % (test_name, trials), bbox_inches = "tight")	
 
 if __name__ == '__main__':
 
